@@ -39,7 +39,7 @@ class MotorVectorApp {
             psif: document.getElementById('input-psif'),
             poles: document.getElementById('input-poles'),
             rpm: document.getElementById('input-rpm'),
-            Umax: document.getElementById('input-umax'),
+            Vdc: document.getElementById('input-vdc'),
             Imax: document.getElementById('input-imax'),
             
             // Slider twins
@@ -48,7 +48,7 @@ class MotorVectorApp {
             Lq_slider: document.getElementById('slider-lq'),
             psif_slider: document.getElementById('slider-psif'),
             rpm_slider: document.getElementById('slider-rpm'),
-            Umax_slider: document.getElementById('slider-umax'),
+            Vdc_slider: document.getElementById('slider-vdc'),
             Imax_slider: document.getElementById('slider-imax'),
 
             // Manual Vector Inputs
@@ -110,7 +110,7 @@ class MotorVectorApp {
 
     bindEvents() {
         // Sync number input & slider twins
-        const paramKeys = ['Rs', 'Ld', 'Lq', 'psif', 'rpm', 'Umax', 'Imax'];
+        const paramKeys = ['Rs', 'Ld', 'Lq', 'psif', 'rpm', 'Vdc', 'Imax'];
         paramKeys.forEach(key => {
             const num = this.inputs[key];
             const slider = this.inputs[`${key}_slider`];
@@ -181,7 +181,7 @@ class MotorVectorApp {
             psif: parseFloat(this.inputs.psif.value),
             poles: parseInt(this.inputs.poles.value),
             rpm: parseFloat(this.inputs.rpm.value),
-            Umax: parseFloat(this.inputs.Umax.value),
+            Vdc: parseFloat(this.inputs.Vdc.value),
             Imax: parseFloat(this.inputs.Imax.value)
         };
 
@@ -198,19 +198,19 @@ class MotorVectorApp {
     loadPreset(name) {
         let p = {};
         if (name === 'spmsm') {
-            p = { Rs: 0.5, Ld: 12, Lq: 12, psif: 0.18, poles: 4, rpm: 1500, Umax: 150, Imax: 30 };
+            p = { Rs: 0.5, Ld: 12, Lq: 12, psif: 0.18, poles: 4, rpm: 1500, Vdc: 260, Imax: 30 };
             this.state.id = 0;
             this.state.iq = 18;
         } else if (name === 'ipmsm') {
-            p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 1800, Umax: 150, Imax: 30 };
-            this.state.id = -8;
-            this.state.iq = 20;
+            p = { Rs: 0.02, Ld: 0.2, Lq: 0.35, psif: 0.045, poles: 4, rpm: 9000, Vdc: 800, Imax: 500 };
+            this.state.id = -220;
+            this.state.iq = 300;
         } else if (name === 'highspeed') {
-            p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 3600, Umax: 150, Imax: 30 };
+            p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 3600, Vdc: 260, Imax: 30 };
             this.state.id = -18;
             this.state.iq = 12;
         } else if (name === 'fieldweakening') {
-            p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 4800, Umax: 150, Imax: 30 };
+            p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 4800, Vdc: 260, Imax: 30 };
             this.state.id = -22;
             this.state.iq = 8;
         }
@@ -288,7 +288,7 @@ class MotorVectorApp {
 
         // Voltage Limit Ellipse in Current Plane
         const vEllipsePts = m.getVoltageLimitCurveInCurrentPlane();
-        this.currentRenderer.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
+        this.currentRenderer.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax.toFixed(1)}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
 
         // Flux Center Point (-psif/Ld, 0)
         const fluxCenter = m.getVoltageEllipseCenterInCurrentPlane();
@@ -310,7 +310,7 @@ class MotorVectorApp {
         this.voltageRenderer.drawGrid(m.Umax, 'V');
 
         // Voltage Limit Circle
-        this.voltageRenderer.drawLimitCircle(m.Umax, `Umax (${m.Umax}V)`, '#f59e0b');
+        this.voltageRenderer.drawLimitCircle(m.Umax, `Umax (${m.Umax.toFixed(1)}V)`, '#f59e0b');
 
         // Current Limit Ellipse in Voltage Plane
         const cEllipsePts = m.getCurrentLimitCurveInVoltagePlane();

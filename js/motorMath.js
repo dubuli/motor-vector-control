@@ -8,20 +8,29 @@ export class MotorMath {
     }
 
     updateParams(p) {
-        this.Rs = p.Rs !== undefined ? p.Rs : 0.5;          // Ohm
-        this.Ld = p.Ld !== undefined ? p.Ld * 1e-3 : 0.010; // Convert mH to H
-        this.Lq = p.Lq !== undefined ? p.Lq * 1e-3 : 0.015; // Convert mH to H
-        this.psif = p.psif !== undefined ? p.psif : 0.175;  // Wb
+        this.Rs = p.Rs !== undefined ? p.Rs : 0.02;           // Ohm
+        this.Ld = p.Ld !== undefined ? p.Ld * 1e-3 : 0.0002;  // Convert mH to H
+        this.Lq = p.Lq !== undefined ? p.Lq * 1e-3 : 0.00035; // Convert mH to H
+        this.psif = p.psif !== undefined ? p.psif : 0.045;    // Wb
         this.poles = p.poles !== undefined ? p.poles : 4;   // Pole pairs
-        const requestedRpm = p.rpm !== undefined ? p.rpm : 1500;
+        const requestedRpm = p.rpm !== undefined ? p.rpm : 9000;
         const requestedDirection = p.direction !== undefined
             ? p.direction
             : (requestedRpm < 0 ? -1 : 1);
         this.direction = requestedDirection < 0 ? -1 : 1;
         this.rpmMagnitude = Math.abs(requestedRpm);
         this.rpm = this.direction * this.rpmMagnitude;       // Signed speed RPM
-        this.Umax = p.Umax !== undefined ? p.Umax : 150;    // Max Phase Voltage (V)
-        this.Imax = p.Imax !== undefined ? p.Imax : 30;     // Max Phase Current (A)
+        if (p.Vdc !== undefined) {
+            this.Vdc = p.Vdc;
+            this.Umax = this.Vdc / Math.sqrt(3);             // SVPWM phase-voltage peak
+        } else if (p.Umax !== undefined) {
+            this.Umax = p.Umax;                              // Backward-compatible direct limit
+            this.Vdc = this.Umax * Math.sqrt(3);
+        } else {
+            this.Vdc = 800;
+            this.Umax = this.Vdc / Math.sqrt(3);
+        }
+        this.Imax = p.Imax !== undefined ? p.Imax : 500;     // Max Phase Current (A)
 
         // Signed electrical angular speed (rad/s): positive forward, negative reverse
         this.omega_e = (this.poles * this.rpm * 2 * Math.PI) / 60;
@@ -94,6 +103,7 @@ export class MotorMath {
             rpm: this.rpm,
             omega_e: this.omega_e,
             direction: this.direction,
+            Vdc: this.Vdc,
             operationMode,
             isVoltageExceeded,
             isCurrentExceeded,

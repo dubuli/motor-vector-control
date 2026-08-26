@@ -520,8 +520,8 @@
                             <label>定子电阻 Rs (Ω)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-rs" min="0" max="2" step="0.05" value="0.5">
-                            <input type="number" id="input-rs" min="0" max="5" step="0.01" value="0.5">
+                            <input type="range" id="slider-rs" min="0" max="2" step="0.01" value="0.02">
+                            <input type="number" id="input-rs" min="0" max="5" step="0.001" value="0.02">
                         </div>
                     </div>
 
@@ -530,8 +530,8 @@
                             <label>d 轴电感 Ld (mH)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-ld" min="1" max="50" step="0.5" value="10">
-                            <input type="number" id="input-ld" min="0.1" max="100" step="0.1" value="10">
+                            <input type="range" id="slider-ld" min="0.1" max="50" step="0.01" value="0.2">
+                            <input type="number" id="input-ld" min="0.01" max="100" step="0.01" value="0.2">
                         </div>
                     </div>
 
@@ -540,8 +540,8 @@
                             <label>q 轴电感 Lq (mH)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-lq" min="1" max="50" step="0.5" value="18">
-                            <input type="number" id="input-lq" min="0.1" max="100" step="0.1" value="18">
+                            <input type="range" id="slider-lq" min="0.1" max="50" step="0.01" value="0.35">
+                            <input type="number" id="input-lq" min="0.01" max="100" step="0.01" value="0.35">
                         </div>
                     </div>
 
@@ -550,18 +550,18 @@
                             <label>永磁磁链 ψf (Wb)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-psif" min="0.01" max="0.5" step="0.005" value="0.175">
-                            <input type="number" id="input-psif" min="0.001" max="1" step="0.005" value="0.175">
+                            <input type="range" id="slider-psif" min="0.005" max="0.5" step="0.005" value="0.045">
+                            <input type="number" id="input-psif" min="0.001" max="1" step="0.005" value="0.045">
                         </div>
                     </div>
 
                     <div class="param-item">
                         <div class="param-header">
-                            <label>电机转速幅值 |N| (RPM)</label>
+                            <label>电机转速幅值 |N| (RPM，最高 13000)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-rpm" min="0" max="6000" step="50" value="1800">
-                            <input type="number" id="input-rpm" min="0" max="10000" step="10" value="1800">
+                            <input type="range" id="slider-rpm" min="0" max="13000" step="50" value="9000">
+                            <input type="number" id="input-rpm" min="0" max="13000" step="10" value="9000">
                         </div>
                         <div class="direction-control" role="group" aria-label="电机旋转方向">
                             <button type="button" id="btn-direction-forward" class="btn-direction forward active" data-direction="1" aria-pressed="true">↻ 正转</button>
@@ -569,7 +569,7 @@
                         </div>
                         <div class="direction-summary">
                             <span id="operating-mode" class="operating-mode">正转电动</span>
-                            <code id="signed-speed">+1800 RPM · ωe +754.0 rad/s</code>
+                            <code id="signed-speed">+9000 RPM · ωe +3769.9 rad/s</code>
                         </div>
                     </div>
 
@@ -584,11 +584,11 @@
 
                     <div class="param-item">
                         <div class="param-header">
-                            <label>最大电压极限 Umax (V)</label>
+                            <label>直流母线电压 Udc (V)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-umax" min="10" max="400" step="5" value="150">
-                            <input type="number" id="input-umax" min="10" max="600" step="1" value="150">
+                            <input type="range" id="slider-vdc" min="200" max="1000" step="10" value="800">
+                            <input type="number" id="input-vdc" min="100" max="1200" step="10" value="800">
                         </div>
                     </div>
 
@@ -597,8 +597,8 @@
                             <label>最大电流极限 Imax (A)</label>
                         </div>
                         <div class="param-controls">
-                            <input type="range" id="slider-imax" min="5" max="100" step="1" value="30">
-                            <input type="number" id="input-imax" min="1" max="200" step="1" value="30">
+                            <input type="range" id="slider-imax" min="5" max="600" step="5" value="500">
+                            <input type="number" id="input-imax" min="1" max="1000" step="5" value="500">
                         </div>
                     </div>
 
@@ -615,11 +615,11 @@
                         <div class="input-box-title">电流矢量 Is (A)</div>
                         <div class="field-group">
                             <span>id:</span>
-                            <input type="number" id="input-id" step="0.5" value="-8">
+                            <input type="number" id="input-id" step="1" value="-220">
                         </div>
                         <div class="field-group">
                             <span>iq:</span>
-                            <input type="number" id="input-iq" step="0.5" value="20">
+                            <input type="number" id="input-iq" step="1" value="300">
                         </div>
                     </div>
 
@@ -627,11 +627,11 @@
                         <div class="input-box-title">电压矢量 Us (V)</div>
                         <div class="field-group">
                             <span>ud:</span>
-                            <input type="number" id="input-ud" step="1" value="0">
+                            <input type="number" id="input-ud" step="1" value="-400.24">
                         </div>
                         <div class="field-group">
                             <span>uq:</span>
-                            <input type="number" id="input-uq" step="1" value="0">
+                            <input type="number" id="input-uq" step="1" value="9.77">
                         </div>
                     </div>
                 </div>
@@ -747,7 +747,7 @@
                     <span>📖 说明与数学原理</span>
                 </div>
                 <p>1. <strong>无需任何后台：</strong> 本网页采用纯原生 JavaScript 编写，无需 Python 或 Node.js 后台支持。双击 <code>index.html</code> 即可在浏览器中完美运行。</p>
-                <p>2. <strong>同图显示与比例映射：</strong> 坐标轴以电流 <code>(A)</code> 为基准物理量，同时按 <code>K_v = I_max / U_max</code> 映射电压矢量 <code>U_s</code> 与电压极限圆，使两者能在同一大图坐标系下直观对比与独立拖动。</p>
+                <p>2. <strong>同图显示与比例映射：</strong> 直流母线电压通过理想 SVPWM 换算为相电压矢量上限 <code>U_max = U_dc / √3</code>。坐标轴以电流 <code>(A)</code> 为基准物理量，并按 <code>K_v = I_max / U_max</code> 映射电压矢量 <code>U_s</code> 与电压极限圆。</p>
                 <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
@@ -765,20 +765,29 @@
             }
 
             updateParams(p) {
-                this.Rs = p.Rs !== undefined ? p.Rs : 0.5;          // Ohm
-                this.Ld = p.Ld !== undefined ? p.Ld * 1e-3 : 0.010; // H
-                this.Lq = p.Lq !== undefined ? p.Lq * 1e-3 : 0.018; // H
-                this.psif = p.psif !== undefined ? p.psif : 0.175;  // Wb
+                this.Rs = p.Rs !== undefined ? p.Rs : 0.02;           // Ohm
+                this.Ld = p.Ld !== undefined ? p.Ld * 1e-3 : 0.0002;  // H
+                this.Lq = p.Lq !== undefined ? p.Lq * 1e-3 : 0.00035; // H
+                this.psif = p.psif !== undefined ? p.psif : 0.045;    // Wb
                 this.poles = p.poles !== undefined ? p.poles : 4;   
-                const requestedRpm = p.rpm !== undefined ? p.rpm : 1800;
+                const requestedRpm = p.rpm !== undefined ? p.rpm : 9000;
                 const requestedDirection = p.direction !== undefined
                     ? p.direction
                     : (requestedRpm < 0 ? -1 : 1);
                 this.direction = requestedDirection < 0 ? -1 : 1;
                 this.rpmMagnitude = Math.abs(requestedRpm);
                 this.rpm = this.direction * this.rpmMagnitude;
-                this.Umax = p.Umax !== undefined ? p.Umax : 150;    // V
-                this.Imax = p.Imax !== undefined ? p.Imax : 30;     // A
+                if (p.Vdc !== undefined) {
+                    this.Vdc = p.Vdc;
+                    this.Umax = this.Vdc / Math.sqrt(3);             // SVPWM phase-voltage peak
+                } else if (p.Umax !== undefined) {
+                    this.Umax = p.Umax;                              // Backward-compatible direct limit
+                    this.Vdc = this.Umax * Math.sqrt(3);
+                } else {
+                    this.Vdc = 800;
+                    this.Umax = this.Vdc / Math.sqrt(3);
+                }
+                this.Imax = p.Imax !== undefined ? p.Imax : 500;     // A
 
                 // Signed electrical speed is the only direction-dependent term
                 // in the steady-state dq voltage equations.
@@ -833,6 +842,7 @@
                     rpm: this.rpm,
                     omega_e: this.omega_e,
                     direction: this.direction,
+                    Vdc: this.Vdc,
                     operationMode,
                     isVoltageExceeded: Us > this.Umax + 1e-3,
                     isCurrentExceeded: Is > this.Imax + 1e-3,
@@ -1143,7 +1153,7 @@
                 ctx.restore();
             }
 
-            drawVector(vx, vy, label, color, type, isHovered, isOverLimit) {
+            drawVector(vx, vy, label, color, type, isHovered, isOverLimit, displayMagnitude = null) {
                 const ctx = this.ctx;
                 ctx.save();
 
@@ -1194,7 +1204,7 @@
                 }
 
                 // Text Badge
-                const magnitude = Math.hypot(vx, vy);
+                const magnitude = displayMagnitude ?? Math.hypot(vx, vy);
                 const unit = type === 'current' ? 'A' : 'V';
                 const deg = (Math.atan2(vy, vx) * 180 / Math.PI).toFixed(1);
 
@@ -1231,7 +1241,7 @@
                     psif: document.getElementById('input-psif'),
                     poles: document.getElementById('input-poles'),
                     rpm: document.getElementById('input-rpm'),
-                    Umax: document.getElementById('input-umax'),
+                    Vdc: document.getElementById('input-vdc'),
                     Imax: document.getElementById('input-imax'),
                     
                     Rs_slider: document.getElementById('slider-rs'),
@@ -1239,7 +1249,7 @@
                     Lq_slider: document.getElementById('slider-lq'),
                     psif_slider: document.getElementById('slider-psif'),
                     rpm_slider: document.getElementById('slider-rpm'),
-                    Umax_slider: document.getElementById('slider-umax'),
+                    Vdc_slider: document.getElementById('slider-vdc'),
                     Imax_slider: document.getElementById('slider-imax'),
 
                     id_input: document.getElementById('input-id'),
@@ -1367,7 +1377,7 @@
             }
 
             bindEvents() {
-                const paramKeys = ['Rs', 'Ld', 'Lq', 'psif', 'rpm', 'Umax', 'Imax'];
+                const paramKeys = ['Rs', 'Ld', 'Lq', 'psif', 'rpm', 'Vdc', 'Imax'];
                 paramKeys.forEach(key => {
                     const num = this.inputs[key];
                     const slider = this.inputs[`${key}_slider`];
@@ -1433,7 +1443,7 @@
                     poles: parseInt(this.inputs.poles.value),
                     rpm: parseFloat(this.inputs.rpm.value),
                     direction: this.direction,
-                    Umax: parseFloat(this.inputs.Umax.value),
+                    Vdc: parseFloat(this.inputs.Vdc.value),
                     Imax: parseFloat(this.inputs.Imax.value)
                 };
                 this.motor.updateParams(p);
@@ -1446,16 +1456,16 @@
             loadPreset(name) {
                 let p = {};
                 if (name === 'spmsm') {
-                    p = { Rs: 0.5, Ld: 12, Lq: 12, psif: 0.18, poles: 4, rpm: 1500, Umax: 150, Imax: 30 };
+                    p = { Rs: 0.5, Ld: 12, Lq: 12, psif: 0.18, poles: 4, rpm: 1500, Vdc: 260, Imax: 30 };
                     this.state.id = 0; this.state.iq = 18;
                 } else if (name === 'ipmsm') {
-                    p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 1800, Umax: 150, Imax: 30 };
-                    this.state.id = -8; this.state.iq = 20;
+                    p = { Rs: 0.02, Ld: 0.2, Lq: 0.35, psif: 0.045, poles: 4, rpm: 9000, Vdc: 800, Imax: 500 };
+                    this.state.id = -220; this.state.iq = 300;
                 } else if (name === 'highspeed') {
-                    p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 3600, Umax: 150, Imax: 30 };
+                    p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 3600, Vdc: 260, Imax: 30 };
                     this.state.id = -18; this.state.iq = 12;
                 } else if (name === 'fieldweakening') {
-                    p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 4800, Umax: 150, Imax: 30 };
+                    p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 4800, Vdc: 260, Imax: 30 };
                     this.state.id = -22; this.state.iq = 8;
                 }
 
@@ -1534,11 +1544,11 @@
                 r.drawCircle(m.Imax, `Imax (${m.Imax}A)`, '#38bdf8');
 
                 // 2. Voltage Limit Circle (Amber Mapped)
-                r.drawCircle(m.Umax * this.Kv, `Umax Circle (${m.Umax}V)`, '#f59e0b', [2, 4]);
+                r.drawCircle(m.Umax * this.Kv, `Umax Circle (${m.Umax.toFixed(1)}V)`, '#f59e0b', [2, 4]);
 
                 // 3. Voltage Limit Ellipse (in Current Plane)
                 const vEllipsePts = m.getVoltageLimitCurveInCurrentPlane();
-                r.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
+                r.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax.toFixed(1)}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
 
                 // 4. Flux Center (-psif/Ld, 0)
                 const fluxCenter = m.getVoltageEllipseCenterInCurrentPlane();
@@ -1558,7 +1568,7 @@
 
                 // 8. Draw Voltage Vector Us (Mapped to current canvas scale)
                 const isHoverU = r.hoveredHandle === 'voltage';
-                r.drawVector(s.ud * this.Kv, s.uq * this.Kv, 'Us', '#f59e0b', 'voltage', isHoverU, metrics.isVoltageExceeded);
+                r.drawVector(s.ud * this.Kv, s.uq * this.Kv, 'Us', '#f59e0b', 'voltage', isHoverU, metrics.isVoltageExceeded, metrics.Us);
             }
         }
 
