@@ -173,9 +173,92 @@ export class MotorMath {
     }
 
     /**
+     * Generate the Maximum Torque Per Voltage trajectory in the current plane.
+     * The standard high-speed expression neglects stator resistance.
+     */
+    getMTPVCurve(maxI = this.Imax, samples = 160, torqueDirection = this.direction) {
+        const points = [];
+        const iqSign = torqueDirection < 0 ? -1 : 1;
+        const diff = this.Ld - this.Lq;
+        const currentRange = maxI * 1.6;
+
+        if (!(this.Ld > 0) || !(this.Lq > 0) || !(currentRange > 0)) return points;
+
+        // For SPMSM, MTPV degenerates to the flux-cancellation vertical line.
+        if (Math.abs(diff) < 1e-9) {
+            const id = -this.psif / this.Ld;
+            const maxIq = Math.sqrt(Math.max(0, currentRange * currentRange - id * id));
+            for (let i = 0; i <= samples; i++) {
+                points.push({ id, iq: iqSign * (i / samples) * maxIq });
+            }
+            return points;
+        }
+
+        for (let i = 0; i <= samples; i++) {
+            const id = -currentRange + (2 * currentRange * i) / samples;
+            const torqueFlux = this.psif + diff * id;
+            const dAxisFlux = this.psif + this.Ld * id;
+            const iqSquared = (this.Ld * dAxisFlux * torqueFlux) / (diff * this.Lq * this.Lq);
+
+            if (iqSquared < -1e-9) continue;
+            const iq = iqSign * Math.sqrt(Math.max(0, iqSquared));
+            if (Math.hypot(id, iq) > currentRange + 1e-6) continue;
+            if (iqSign * this.calcTorque(id, iq) < -1e-6) continue;
+            points.push({ id, iq });
+        }
+        return points;
+    }
+
+    /**
+     * Exact peak torque on the current-limit circle. Both stationary points are
+     * checked because unusual saliency/flux combinations can move the maximum
+     * to the other constant-torque branch.
+     */
+    getCurrentLimitedPeakTorque(torqueDirection = this.direction) {
+        const torqueSign = torqueDirection < 0 ? -1 : 1;
+        const current = this.Imax;
+        const diff = this.Ld - this.Lq;
+
+        if (!(current > 0) || !(this.poles > 0)) return 0;
+
+        const candidates = [0];
+        if (Math.abs(diff) > 1e-12) {
+            const root = Math.sqrt(this.psif * this.psif + 8 * diff * diff * current * current);
+            candidates.push(
+                (-this.psif + root) / (4 * diff),
+                (-this.psif - root) / (4 * diff)
+            );
+        }
+
+        let peakMagnitude = 0;
+        for (const id of candidates) {
+            if (!Number.isFinite(id) || Math.abs(id) > current + 1e-9) continue;
+            const iqMagnitude = Math.sqrt(Math.max(0, current * current - id * id));
+            const torqueMagnitude = Math.abs(this.calcTorque(id, iqMagnitude));
+            peakMagnitude = Math.max(peakMagnitude, torqueMagnitude);
+        }
+        return torqueSign * peakMagnitude;
+    }
+
+    /**
+     * Generate evenly distributed levels and always include the exact
+     * current-limited peak as the final contour.
+     */
+    getSuggestedTorqueLevels(count = 5, torqueDirection = this.direction) {
+        const levelCount = Math.max(0, Math.floor(count));
+        const peakTorque = this.getCurrentLimitedPeakTorque(torqueDirection);
+        if (!(Math.abs(peakTorque) > 0) || levelCount === 0) return [];
+
+        return Array.from(
+            { length: levelCount },
+            (_, index) => peakTorque * ((index + 1) / levelCount)
+        );
+    }
+
+    /**
      * Generate Constant Torque Contour curves in Current Plane
      */
-    getTorqueContours(torques = [], idMin = -this.Imax * 1.8, idMax = this.Imax * 0.5, samples = 80) {
+    getTorqueContours(torques = [], idMin = -this.Imax * 1.6, idMax = this.Imax * 1.6, samples = 360) {
         const contours = [];
         const diff = this.Ld - this.Lq;
 
@@ -186,11 +269,14 @@ export class MotorMath {
                 const denom = 1.5 * this.poles * (this.psif + diff * id);
                 if (Math.abs(denom) > 1e-5) {
                     const iq = T / denom;
-                    if (Math.abs(iq) <= this.Imax * 2.0) {
+                    if (Number.isFinite(iq) && Math.abs(iq) <= this.Imax * 1.6) {
                         pts.push({ id, iq });
+                        continue;
                     }
                 }
+                if (pts.length > 0 && pts[pts.length - 1] !== null) pts.push(null);
             }
+            while (pts[pts.length - 1] === null) pts.pop();
             if (pts.length > 0) {
                 contours.push({ T, points: pts });
             }

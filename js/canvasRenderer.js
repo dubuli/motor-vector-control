@@ -286,6 +286,33 @@ export class CanvasRenderer {
     }
 
     /**
+     * Draw MTPV Curve
+     */
+    drawMTPV(points, color = '#a855f7') {
+        if (!points || points.length < 2) return;
+        const ctx = this.ctx;
+        ctx.save();
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.4;
+        ctx.setLineDash([10, 4, 2, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+            const { px, py } = this.toScreen(points[i].id, points[i].iq);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+
+        const labelPoint = points[Math.floor(points.length * 0.55)];
+        const { px, py } = this.toScreen(labelPoint.id, labelPoint.iq);
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = color;
+        ctx.fillText('MTPV', px + 6, py - 5);
+        ctx.restore();
+    }
+
+    /**
      * Draw Torque Contours
      */
     drawTorqueContours(contours, color = 'rgba(148, 163, 184, 0.4)') {
@@ -296,20 +323,32 @@ export class CanvasRenderer {
         ctx.setLineDash([2, 4]);
 
         for (const contour of contours) {
-            if (contour.points.length < 2) continue;
+            const visiblePoints = contour.points.filter(point => point !== null);
+            if (visiblePoints.length < 2) continue;
             ctx.beginPath();
+            let segmentStarted = false;
             for (let i = 0; i < contour.points.length; i++) {
-                const { px, py } = this.toScreen(contour.points[i].id, contour.points[i].iq);
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
+                const point = contour.points[i];
+                if (point === null) {
+                    segmentStarted = false;
+                    continue;
+                }
+                const { px, py } = this.toScreen(point.id, point.iq);
+                if (!segmentStarted) {
+                    ctx.moveTo(px, py);
+                    segmentStarted = true;
+                } else {
+                    ctx.lineTo(px, py);
+                }
             }
             ctx.stroke();
 
-            const mid = contour.points[Math.floor(contour.points.length / 2)];
+            const mid = visiblePoints[Math.floor(visiblePoints.length / 2)];
             const { px, py } = this.toScreen(mid.id, mid.iq);
             ctx.font = '9px sans-serif';
             ctx.fillStyle = '#64748b';
-            ctx.fillText(`${contour.T.toFixed(0)}Nm`, px + 4, py - 2);
+            const digits = Math.abs(contour.T) < 10 ? 2 : (Math.abs(contour.T) < 100 ? 1 : 0);
+            ctx.fillText(`${contour.T.toFixed(digits)}Nm`, px + 4, py - 2);
         }
 
         ctx.restore();

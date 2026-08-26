@@ -370,6 +370,7 @@
         .legend-dot.voltage { background: var(--accent-voltage); box-shadow: 0 0 8px var(--accent-voltage); }
         .legend-dot.ellipse { background: rgba(245, 158, 11, 0.4); border: 1px solid var(--accent-voltage); }
         .legend-dot.mtpa { background: var(--accent-success); }
+        .legend-dot.mtpv { background: var(--accent-purple); box-shadow: 0 0 8px var(--accent-purple); }
 
         /* LARGE CANVAS CONTAINER */
         .large-canvas-wrapper {
@@ -651,6 +652,7 @@
                         <div class="legend-item"><span class="legend-dot voltage"></span>电压矢量 Us</div>
                         <div class="legend-item"><span class="legend-dot ellipse"></span>电压极限椭圆</div>
                         <div class="legend-item"><span class="legend-dot mtpa"></span>MTPA 轨迹</div>
+                        <div class="legend-item"><span class="legend-dot mtpv"></span>MTPV 轨迹</div>
                     </div>
                 </div>
                 <div class="large-canvas-wrapper">
@@ -751,6 +753,7 @@
                 <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
+                <p>6. <strong>MTPV 轨迹：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹；等转矩线等级根据当前电机参数与电流上限自动生成。</p>
             </div>
 
         </main>
@@ -884,19 +887,91 @@
                 return points;
             }
 
-            getTorqueContours(torques = [10, 20, 30, 40], idMin = -this.Imax * 1.8, idMax = this.Imax * 0.5) {
+            getMTPVCurve(maxI = this.Imax, samples = 160, torqueDirection = this.direction) {
+                const points = [];
+                const iqSign = torqueDirection < 0 ? -1 : 1;
+                const diff = this.Ld - this.Lq;
+                const currentRange = maxI * 1.6;
+
+                if (!(this.Ld > 0) || !(this.Lq > 0) || !(currentRange > 0)) return points;
+
+                if (Math.abs(diff) < 1e-9) {
+                    const id = -this.psif / this.Ld;
+                    const maxIq = Math.sqrt(Math.max(0, currentRange * currentRange - id * id));
+                    for (let i = 0; i <= samples; i++) {
+                        points.push({ id, iq: iqSign * (i / samples) * maxIq });
+                    }
+                    return points;
+                }
+
+                for (let i = 0; i <= samples; i++) {
+                    const id = -currentRange + (2 * currentRange * i) / samples;
+                    const torqueFlux = this.psif + diff * id;
+                    const dAxisFlux = this.psif + this.Ld * id;
+                    const iqSquared = (this.Ld * dAxisFlux * torqueFlux) / (diff * this.Lq * this.Lq);
+                    if (iqSquared < -1e-9) continue;
+
+                    const iq = iqSign * Math.sqrt(Math.max(0, iqSquared));
+                    if (Math.hypot(id, iq) > currentRange + 1e-6) continue;
+                    if (iqSign * this.calcTorque(id, iq) < -1e-6) continue;
+                    points.push({ id, iq });
+                }
+                return points;
+            }
+
+            getCurrentLimitedPeakTorque(torqueDirection = this.direction) {
+                const torqueSign = torqueDirection < 0 ? -1 : 1;
+                const current = this.Imax;
+                const diff = this.Ld - this.Lq;
+                if (!(current > 0) || !(this.poles > 0)) return 0;
+
+                const candidates = [0];
+                if (Math.abs(diff) > 1e-12) {
+                    const root = Math.sqrt(this.psif * this.psif + 8 * diff * diff * current * current);
+                    candidates.push(
+                        (-this.psif + root) / (4 * diff),
+                        (-this.psif - root) / (4 * diff)
+                    );
+                }
+
+                let peakMagnitude = 0;
+                for (const id of candidates) {
+                    if (!Number.isFinite(id) || Math.abs(id) > current + 1e-9) continue;
+                    const iqMagnitude = Math.sqrt(Math.max(0, current * current - id * id));
+                    peakMagnitude = Math.max(peakMagnitude, Math.abs(this.calcTorque(id, iqMagnitude)));
+                }
+                return torqueSign * peakMagnitude;
+            }
+
+            getSuggestedTorqueLevels(count = 5, torqueDirection = this.direction) {
+                const levelCount = Math.max(0, Math.floor(count));
+                const peakTorque = this.getCurrentLimitedPeakTorque(torqueDirection);
+                if (!(Math.abs(peakTorque) > 0) || levelCount === 0) return [];
+
+                return Array.from(
+                    { length: levelCount },
+                    (_, index) => peakTorque * ((index + 1) / levelCount)
+                );
+            }
+
+            getTorqueContours(torques = [], idMin = -this.Imax * 1.6, idMax = this.Imax * 1.6, samples = 360) {
                 const contours = [];
                 const diff = this.Ld - this.Lq;
                 for (const T of torques) {
                     const pts = [];
-                    for (let i = 0; i <= 60; i++) {
-                        const id = idMin + (i / 60) * (idMax - idMin);
+                    for (let i = 0; i <= samples; i++) {
+                        const id = idMin + (i / samples) * (idMax - idMin);
                         const denom = 1.5 * this.poles * (this.psif + diff * id);
                         if (Math.abs(denom) > 1e-5) {
                             const iq = T / denom;
-                            if (Math.abs(iq) <= this.Imax * 2.2) pts.push({ id, iq });
+                            if (Number.isFinite(iq) && Math.abs(iq) <= this.Imax * 1.6) {
+                                pts.push({ id, iq });
+                                continue;
+                            }
                         }
+                        if (pts.length > 0 && pts[pts.length - 1] !== null) pts.push(null);
                     }
+                    while (pts[pts.length - 1] === null) pts.pop();
                     if (pts.length > 0) contours.push({ T, points: pts });
                 }
                 return contours;
@@ -1127,6 +1202,30 @@
                 ctx.restore();
             }
 
+            drawMTPV(points, color = '#a855f7') {
+                if (!points || points.length < 2) return;
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([10, 4, 2, 4]);
+
+                ctx.beginPath();
+                for (let i = 0; i < points.length; i++) {
+                    const { px, py } = this.toScreen(points[i].id, points[i].iq);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+
+                const labelPoint = points[Math.floor(points.length * 0.55)];
+                const { px, py } = this.toScreen(labelPoint.id, labelPoint.iq);
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = color;
+                ctx.fillText('MTPV', px + 6, py - 5);
+                ctx.restore();
+            }
+
             drawTorqueContours(contours) {
                 const ctx = this.ctx;
                 ctx.save();
@@ -1135,20 +1234,32 @@
                 ctx.setLineDash([2, 4]);
 
                 for (const c of contours) {
-                    if (c.points.length < 2) continue;
+                    const visiblePoints = c.points.filter(point => point !== null);
+                    if (visiblePoints.length < 2) continue;
                     ctx.beginPath();
+                    let segmentStarted = false;
                     for (let i = 0; i < c.points.length; i++) {
-                        const { px, py } = this.toScreen(c.points[i].id, c.points[i].iq);
-                        if (i === 0) ctx.moveTo(px, py);
-                        else ctx.lineTo(px, py);
+                        const point = c.points[i];
+                        if (point === null) {
+                            segmentStarted = false;
+                            continue;
+                        }
+                        const { px, py } = this.toScreen(point.id, point.iq);
+                        if (!segmentStarted) {
+                            ctx.moveTo(px, py);
+                            segmentStarted = true;
+                        } else {
+                            ctx.lineTo(px, py);
+                        }
                     }
                     ctx.stroke();
 
-                    const mid = c.points[Math.floor(c.points.length / 2)];
+                    const mid = visiblePoints[Math.floor(visiblePoints.length / 2)];
                     const { px, py } = this.toScreen(mid.id, mid.iq);
                     ctx.font = '9px sans-serif';
                     ctx.fillStyle = '#64748b';
-                    ctx.fillText(`${c.T.toFixed(0)}Nm`, px + 4, py - 2);
+                    const digits = Math.abs(c.T) < 10 ? 2 : (Math.abs(c.T) < 100 ? 1 : 0);
+                    ctx.fillText(`${c.T.toFixed(digits)}Nm`, px + 4, py - 2);
                 }
                 ctx.restore();
             }
@@ -1558,15 +1669,20 @@
                 const mtpaPts = m.getMTPACurve(m.Imax, 50, m.direction);
                 r.drawMTPA(mtpaPts, '#10b981');
 
-                // 6. Torque Contours
-                const contours = m.getTorqueContours([10, 20, 30, 40, 50].map(T => T * m.direction));
+                // 6. MTPV Curve
+                const mtpvPts = m.getMTPVCurve(m.Imax, 240, m.direction);
+                r.drawMTPV(mtpvPts, '#a855f7');
+
+                // 7. Torque Contours (including exact current-limited peak)
+                const torqueLevels = m.getSuggestedTorqueLevels(5, m.direction);
+                const contours = m.getTorqueContours(torqueLevels);
                 r.drawTorqueContours(contours);
 
-                // 7. Draw Current Vector Is
+                // 8. Draw Current Vector Is
                 const isHoverI = r.hoveredHandle === 'current';
                 r.drawVector(s.id, s.iq, 'Is', '#38bdf8', 'current', isHoverI, metrics.isCurrentExceeded);
 
-                // 8. Draw Voltage Vector Us (Mapped to current canvas scale)
+                // 9. Draw Voltage Vector Us (Mapped to current canvas scale)
                 const isHoverU = r.hoveredHandle === 'voltage';
                 r.drawVector(s.ud * this.Kv, s.uq * this.Kv, 'Us', '#f59e0b', 'voltage', isHoverU, metrics.isVoltageExceeded, metrics.Us);
             }

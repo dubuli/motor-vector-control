@@ -298,8 +298,12 @@ class MotorVectorApp {
         const mtpaPts = m.getMTPACurve(m.Imax);
         this.currentRenderer.drawMTPA(mtpaPts, '#10b981');
 
+        // MTPV Curve
+        const mtpvPts = m.getMTPVCurve(m.Imax);
+        this.currentRenderer.drawMTPV(mtpvPts, '#a855f7');
+
         // Torque Contours
-        const torqueValues = [5, 10, 20, 30, 40, 50];
+        const torqueValues = m.getSuggestedTorqueLevels(5);
         const contours = m.getTorqueContours(torqueValues);
         this.currentRenderer.drawTorqueContours(contours);
 
