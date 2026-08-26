@@ -152,8 +152,8 @@ export class MotorMath {
             let id = 0;
             if (!isSPMSM) {
                 const diff = this.Ld - this.Lq; // < 0 for IPMSM
-                const term1 = this.psif / (2 * diff);
-                id = term1 - Math.sqrt(term1 * term1 + iq * iq);
+                const root = Math.hypot(this.psif, 2 * diff * iq);
+                id = (-this.psif + root) / (2 * diff);
             }
             if (Math.hypot(id, iq) <= maxI * 1.5) {
                 points.push({ id, iq });
