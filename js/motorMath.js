@@ -13,11 +13,17 @@ export class MotorMath {
         this.Lq = p.Lq !== undefined ? p.Lq * 1e-3 : 0.015; // Convert mH to H
         this.psif = p.psif !== undefined ? p.psif : 0.175;  // Wb
         this.poles = p.poles !== undefined ? p.poles : 4;   // Pole pairs
-        this.rpm = p.rpm !== undefined ? p.rpm : 1500;       // Speed RPM
+        const requestedRpm = p.rpm !== undefined ? p.rpm : 1500;
+        const requestedDirection = p.direction !== undefined
+            ? p.direction
+            : (requestedRpm < 0 ? -1 : 1);
+        this.direction = requestedDirection < 0 ? -1 : 1;
+        this.rpmMagnitude = Math.abs(requestedRpm);
+        this.rpm = this.direction * this.rpmMagnitude;       // Signed speed RPM
         this.Umax = p.Umax !== undefined ? p.Umax : 150;    // Max Phase Voltage (V)
         this.Imax = p.Imax !== undefined ? p.Imax : 30;     // Max Phase Current (A)
 
-        // Calculate electrical angular speed (rad/s)
+        // Signed electrical angular speed (rad/s): positive forward, negative reverse
         this.omega_e = (this.poles * this.rpm * 2 * Math.PI) / 60;
     }
 
@@ -63,6 +69,16 @@ export class MotorMath {
         const S = 1.5 * Us * Is;
         const powerFactor = S > 1e-6 ? Math.min(1.0, Math.max(-1.0, Pin / S)) : 1.0;
         const powerAngle = (Math.atan2(uq, ud) - Math.atan2(iq, id)) * (180 / Math.PI);
+        const directionLabel = this.direction > 0 ? '正转' : '反转';
+        const speedTorqueProduct = this.rpm * Te;
+        let operationMode = '静止';
+        if (Math.abs(this.rpm) > 1e-9 && Math.abs(Te) <= 1e-9) {
+            operationMode = `${directionLabel}空载 / 零转矩`;
+        } else if (Math.abs(this.rpm) > 1e-9) {
+            operationMode = speedTorqueProduct > 0
+                ? `${directionLabel}电动`
+                : `${directionLabel}发电 / 制动`;
+        }
 
         const isVoltageExceeded = Us > this.Umax + 1e-3;
         const isCurrentExceeded = Is > this.Imax + 1e-3;
@@ -75,6 +91,10 @@ export class MotorMath {
             S,
             powerFactor,
             powerAngle,
+            rpm: this.rpm,
+            omega_e: this.omega_e,
+            direction: this.direction,
+            operationMode,
             isVoltageExceeded,
             isCurrentExceeded,
             voltageRatio: (Us / this.Umax) * 100,
@@ -122,12 +142,13 @@ export class MotorMath {
     /**
      * Generate MTPA (Maximum Torque Per Ampere) curve in Current Plane
      */
-    getMTPACurve(maxI = this.Imax, samples = 50) {
+    getMTPACurve(maxI = this.Imax, samples = 50, torqueDirection = this.direction) {
         const points = [];
         const isSPMSM = Math.abs(this.Ld - this.Lq) < 1e-6;
+        const iqSign = torqueDirection < 0 ? -1 : 1;
 
         for (let i = 0; i <= samples; i++) {
-            const iq = (i / samples) * maxI * 1.2;
+            const iq = iqSign * (i / samples) * maxI * 1.2;
             let id = 0;
             if (!isSPMSM) {
                 const diff = this.Ld - this.Lq; // < 0 for IPMSM
