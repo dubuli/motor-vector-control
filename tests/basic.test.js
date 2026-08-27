@@ -23,11 +23,12 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(
-  `${scripts.at(-1)[1]}\nthis.MotorMathEngineForTest = MotorMathEngine; this.StandaloneAppForTest = StandaloneApp;`,
+  `${scripts.at(-1)[1]}\nthis.MotorMathEngineForTest = MotorMathEngine; this.UnifiedCanvasRendererForTest = UnifiedCanvasRenderer; this.StandaloneAppForTest = StandaloneApp;`,
   context
 );
 
 const MotorMathEngine = context.MotorMathEngineForTest;
+const UnifiedCanvasRenderer = context.UnifiedCanvasRendererForTest;
 const StandaloneApp = context.StandaloneAppForTest;
 
 function createFakeElement(id) {
@@ -51,7 +52,8 @@ function createFakeCanvas(id) {
   const context2d = {};
   for (const method of [
     'arc', 'beginPath', 'clearRect', 'closePath', 'fill', 'fillText', 'lineTo',
-    'moveTo', 'restore', 'rotate', 'save', 'scale', 'setLineDash', 'stroke', 'translate'
+    'moveTo', 'restore', 'rotate', 'save', 'scale', 'setLineDash', 'setTransform',
+    'stroke', 'translate'
   ]) {
     context2d[method] = () => {};
   }
@@ -126,7 +128,9 @@ test('MTPA point agrees with a brute-force current-circle search', () => {
 test('MTPV condition and torque-contour anchors remain exact', () => {
   const motor = new MotorMathEngine(presets.ipmsm.params);
   const diff = motor.Ld - motor.Lq;
-  for (const point of motor.getMTPVCurve(motor.Imax, 240, 1)) {
+  const mtpvPoints = motor.getMTPVCurve(motor.Imax, 240, 1);
+  for (const point of mtpvPoints) {
+    assert.ok(motor.psif + diff * point.id > 0, 'MTPV must stay on the PM-assisted main branch');
     const lhs = diff * motor.Lq * motor.Lq * point.iq * point.iq;
     const rhs = motor.Ld
       * (motor.psif + motor.Ld * point.id)
@@ -134,10 +138,49 @@ test('MTPV condition and torque-contour anchors remain exact', () => {
     assert.ok(Math.abs(lhs - rhs) < 1e-18);
   }
 
+  for (let index = 1; index < mtpvPoints.length; index += 1) {
+    const jump = Math.hypot(
+      mtpvPoints[index].id - mtpvPoints[index - 1].id,
+      mtpvPoints[index].iq - mtpvPoints[index - 1].iq
+    );
+    assert.ok(jump < motor.Imax * 0.1, `MTPV contains an artificial ${jump.toFixed(1)} A jump`);
+  }
+
   for (const contour of motor.getSuggestedTorqueContours(5, 1)) {
     assert.ok(contour.anchor);
     assert.ok(Math.abs(motor.calcTorque(contour.anchor.id, contour.anchor.iq) - contour.T) < 1e-10);
   }
+});
+
+test('IPMSM torque contours include both exact branches without crossing the asymptote', () => {
+  const motor = new MotorMathEngine(presets.ipmsm.params);
+  const diff = motor.Ld - motor.Lq;
+  const asymptoteId = -motor.psif / diff;
+
+  for (const direction of [1, -1]) {
+    const contours = motor.getSuggestedTorqueContours(10, direction);
+    assert.equal(contours.length, 10);
+
+    for (const contour of contours) {
+      assert.equal(contour.segments.length, 2);
+      assert.ok(contour.segments[0].at(-1).id < asymptoteId);
+      assert.ok(contour.segments[1][0].id > asymptoteId);
+      assert.ok(contour.segments[1].some(point => point.id > 0));
+      assert.ok(contour.segments[1].every(point => Math.sign(point.iq) === -direction));
+
+      for (const segment of contour.segments) {
+        for (const point of segment) {
+          assert.ok(Math.abs(motor.calcTorque(point.id, point.iq) - contour.T) < 1e-9);
+        }
+      }
+    }
+  }
+});
+
+test('torque-contour rendering uses ten levels without a white peak line', () => {
+  assert.match(html, /getSuggestedTorqueContours\(10, m\.direction\)/);
+  assert.doesNotMatch(html, /c\.isPeak \? '#e2e8f0'/);
+  assert.match(html, /0\.1 \/ 0\.2 \/ … \/ 1\.0 × Imax/);
 });
 
 test('singular inverse is reported and power-factor angle is normalized', () => {
@@ -186,6 +229,22 @@ test('canvas grid and resize fixes remain present', () => {
   assert.match(html, /ctx\.moveTo\(0, py\);/);
   assert.doesNotMatch(html, /ctx\.moveTo\(0, this\.width\);/);
   assert.match(html, /requestAnimationFrame\(\(\) => \{/);
+  assert.match(html, /new ResizeObserver\(scheduleCanvasResize\)/);
+  assert.match(html, /window\.addEventListener\('pageshow', scheduleCanvasResize\)/);
+  assert.match(html, /if \(!document\.hidden\) scheduleCanvasResize\(\)/);
+  assert.match(html, /\.workspace \{[\s\S]*?order: -1;/);
+});
+
+test('a transient zero-size layout does not clear the last valid canvas', () => {
+  const canvas = createFakeCanvas('resize-test');
+  let rect = { width: 1000, height: 640, left: 0, top: 0 };
+  canvas.getBoundingClientRect = () => rect;
+  const renderer = new UnifiedCanvasRenderer(canvas);
+  const validBitmap = [canvas.width, canvas.height];
+
+  rect = { width: 0, height: 0, left: 0, top: 0 };
+  assert.equal(renderer.resize(), false);
+  assert.deepEqual([canvas.width, canvas.height], validBitmap);
 });
 
 test('standalone page boots and renders with every required DOM element', () => {
@@ -207,6 +266,7 @@ test('standalone page boots and renders with every required DOM element', () => 
   });
 
   context.document = {
+    addEventListener: () => {},
     getElementById: id => elements.get(id) || null,
     querySelectorAll: selector => {
       if (selector === '.btn-direction') return directionButtons;

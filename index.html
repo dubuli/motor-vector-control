@@ -196,6 +196,12 @@
             .main-container {
                 grid-template-columns: 1fr;
             }
+
+            /* Keep the visualization above the long control panel when the
+               layout collapses to one column. */
+            .workspace {
+                order: -1;
+            }
         }
 
         /* Sidebar Controls */
@@ -317,6 +323,7 @@
             display: flex;
             flex-direction: column;
             gap: 16px;
+            min-width: 0;
         }
 
         .canvas-card {
@@ -371,6 +378,7 @@
         .legend-dot.ellipse { background: rgba(245, 158, 11, 0.4); border: 1px solid var(--accent-voltage); }
         .legend-dot.mtpa { background: var(--accent-success); }
         .legend-dot.mtpv { background: var(--accent-purple); box-shadow: 0 0 8px var(--accent-purple); }
+        .legend-dot.torque { background: #94a3b8; box-shadow: 0 0 6px rgba(148, 163, 184, 0.65); }
 
         /* LARGE CANVAS CONTAINER */
         .large-canvas-wrapper {
@@ -689,6 +697,7 @@
                         <div class="legend-item"><span class="legend-dot ellipse"></span>电压极限椭圆</div>
                         <div class="legend-item"><span class="legend-dot mtpa"></span>MTPA 轨迹</div>
                         <div class="legend-item"><span class="legend-dot mtpv"></span>MTPV 轨迹</div>
+                        <div class="legend-item"><span class="legend-dot torque"></span>等转矩线</div>
                     </div>
                 </div>
                 <div class="large-canvas-wrapper">
@@ -790,7 +799,7 @@
                 <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。当 <code>Rs = 0</code> 且转速为零时该逆运算没有唯一解，页面会保留原电流并显示提示。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
-                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.2 / 0.4 / 0.6 / 0.8 / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 仅绘制 <code>ψf + (Ld−Lq)·id &gt; 0</code> 且 <code>iq</code> 与转矩方向同号的主工作分支，该分支会正常延伸到右半平面。</p>
+                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.1 / 0.2 / … / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 按 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 绘制完整的两个数学分支，并在 <code>ψf + (Ld−Lq)id = 0</code> 的奇点区域断开。</p>
             </div>
 
         </main>
@@ -952,6 +961,12 @@
                     const id = -currentRange + (2 * currentRange * i) / samples;
                     const torqueFlux = this.psif + diff * id;
                     const dAxisFlux = this.psif + this.Ld * id;
+                    const torqueFluxTolerance = Math.max(1e-12, Math.abs(this.psif) * 1e-10);
+                    // Keep only the PM-assisted main branch. The isolated
+                    // torqueFlux = 0 root is not an MTPV operating point and
+                    // would otherwise be joined to the valid curve by a long
+                    // straight line on the canvas.
+                    if (!(torqueFlux > torqueFluxTolerance)) continue;
                     const iqSquared = (this.Ld * dAxisFlux * torqueFlux) / (diff * this.Lq * this.Lq);
                     if (iqSquared < -1e-9) continue;
 
@@ -1064,13 +1079,19 @@
                             intervals = [[idMin, idMax]];
                         }
                     } else {
+                        // |iq| <= iqLimit leaves two visible algebraic branches
+                        // around the torque-flux asymptote. Sample them as
+                        // separate segments so the renderer never draws a
+                        // false line through ψf + (Ld - Lq)id = 0.
                         const minimumFluxMagnitude = Math.abs(T) / (torqueConstant * iqLimit);
-                        const visibleBoundary = (minimumFluxMagnitude - this.psif) / diff;
-                        if (diff < 0) {
-                            intervals = [[idMin, Math.min(idMax, visibleBoundary)]];
-                        } else {
-                            intervals = [[Math.max(idMin, visibleBoundary), idMax]];
-                        }
+                        const firstBoundary = (minimumFluxMagnitude - this.psif) / diff;
+                        const secondBoundary = (-minimumFluxMagnitude - this.psif) / diff;
+                        const gapStart = Math.min(firstBoundary, secondBoundary);
+                        const gapEnd = Math.max(firstBoundary, secondBoundary);
+                        intervals = [
+                            [idMin, Math.min(idMax, gapStart)],
+                            [Math.max(idMin, gapEnd), idMax]
+                        ];
                     }
 
                     const segments = [];
@@ -1121,21 +1142,43 @@
                 this.ctx = canvas.getContext('2d');
                 this.handleRadius = 10;
                 this.hoveredHandle = null; // 'current' or 'voltage' or null
+
+                // Keep a safe initial backing store for pages that are opened
+                // inside a temporarily hidden preview pane.
+                this.dpr = 1;
+                this.width = 800;
+                this.height = 600;
+                this.originX = this.width / 2;
+                this.originY = this.height / 2;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
                 this.resize();
             }
 
             resize() {
                 const rect = this.canvas.getBoundingClientRect();
-                this.dpr = window.devicePixelRatio || 1;
-                this.width = rect.width || 800;
-                this.height = rect.height || 600;
+                const nextWidth = Math.round(rect.width);
+                const nextHeight = Math.round(rect.height);
 
-                this.canvas.width = this.width * this.dpr;
-                this.canvas.height = this.height * this.dpr;
-                this.ctx.scale(this.dpr, this.dpr);
+                // A hidden iframe/tab can briefly report 0 × 0. Do not clear
+                // the last valid canvas; ResizeObserver/pageshow will retry.
+                if (!(nextWidth > 0) || !(nextHeight > 0)) return false;
+
+                this.dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+                this.width = nextWidth;
+                this.height = nextHeight;
+
+                const bitmapWidth = Math.max(1, Math.round(this.width * this.dpr));
+                const bitmapHeight = Math.max(1, Math.round(this.height * this.dpr));
+                if (this.canvas.width !== bitmapWidth || this.canvas.height !== bitmapHeight) {
+                    this.canvas.width = bitmapWidth;
+                    this.canvas.height = bitmapHeight;
+                }
+                this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
                 this.originX = this.width / 2;
                 this.originY = this.height / 2;
+                return true;
             }
 
             toScreen(x, y) {
@@ -1374,8 +1417,10 @@
                     const visiblePoints = segments.flat();
                     if (visiblePoints.length < 2) continue;
 
-                    ctx.strokeStyle = c.isPeak ? '#e2e8f0' : 'rgba(148, 163, 184, 0.35)';
-                    ctx.lineWidth = c.isPeak ? 1.8 : 1;
+                    ctx.strokeStyle = c.isPeak
+                        ? 'rgba(148, 163, 184, 0.86)'
+                        : 'rgba(148, 163, 184, 0.68)';
+                    ctx.lineWidth = c.isPeak ? 1.5 : 1.2;
                     ctx.beginPath();
                     for (const segment of segments) {
                         for (let i = 0; i < segment.length; i++) {
@@ -1389,7 +1434,7 @@
                     const labelPoint = c.anchor || visiblePoints[Math.floor(visiblePoints.length / 2)];
                     const { px, py } = this.toScreen(labelPoint.id, labelPoint.iq);
                     ctx.font = '9px sans-serif';
-                    ctx.fillStyle = c.isPeak ? '#e2e8f0' : '#64748b';
+                    ctx.fillStyle = c.isPeak ? '#cbd5e1' : '#94a3b8';
                     const digits = Math.abs(c.T) < 10 ? 2 : (Math.abs(c.T) < 100 ? 1 : 0);
                     ctx.fillText(`${c.T.toFixed(digits)}Nm`, px + 4, py - 2);
                 }
@@ -1536,6 +1581,7 @@
 
                 this.activeDrag = null; // 'current' or 'voltage'
                 this.resizeFrame = null;
+                this.canvasResizeObserver = null;
 
                 // Mouse & Touch events for Dragging both handles on the same canvas
                 const c = canvas;
@@ -1551,14 +1597,27 @@
                 }, { passive: false });
                 window.addEventListener('touchend', () => this.handleUp());
 
-                window.addEventListener('resize', () => {
+                const scheduleCanvasResize = () => {
                     if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
                     this.resizeFrame = requestAnimationFrame(() => {
                         this.resizeFrame = null;
-                        this.renderer.resize();
-                        this.renderAll();
+                        if (this.renderer.resize()) this.renderAll();
                     });
+                };
+
+                window.addEventListener('resize', scheduleCanvasResize);
+                window.addEventListener('pageshow', scheduleCanvasResize);
+                document.addEventListener('visibilitychange', () => {
+                    if (!document.hidden) scheduleCanvasResize();
                 });
+
+                if (typeof ResizeObserver === 'function') {
+                    this.canvasResizeObserver = new ResizeObserver(scheduleCanvasResize);
+                    this.canvasResizeObserver.observe(c.parentElement || c);
+                }
+
+                c.addEventListener('contextlost', (event) => event.preventDefault());
+                c.addEventListener('contextrestored', scheduleCanvasResize);
             }
 
             getCanvasPos(e) {
@@ -1861,7 +1920,7 @@
                 r.drawMTPV(mtpvPts, '#a855f7');
 
                 // 7. Torque Contours (MTPA-anchored, including exact Imax peak)
-                const contours = m.getSuggestedTorqueContours(5, m.direction);
+                const contours = m.getSuggestedTorqueContours(10, m.direction);
                 r.drawTorqueContours(contours);
 
                 // 8. Draw Current Vector Is
