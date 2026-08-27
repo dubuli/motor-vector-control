@@ -799,7 +799,7 @@
                 <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。当 <code>Rs = 0</code> 且转速为零时该逆运算没有唯一解，页面会保留原电流并显示提示。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
-                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.1 / 0.2 / … / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 按 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 绘制完整的两个数学分支，并在 <code>ψf + (Ld−Lq)id = 0</code> 的奇点区域断开。</p>
+                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.1 / 0.2 / … / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 按 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 分段绘制。正磁链主工作分支仅保留电流限幅附近的有效区，避免超限尾部形成射线束；右侧负磁链数学分支继续完整显示，并在奇点区域断开。</p>
             </div>
 
         </main>
@@ -1066,6 +1066,7 @@
                 const diff = this.Ld - this.Lq;
                 const torqueConstant = 1.5 * this.poles;
                 const iqLimit = this.Imax * 1.6;
+                const mainBranchDisplayLimit = this.Imax * 1.02;
                 const fullSpan = idMax - idMin;
                 if (!(torqueConstant > 0) || !(iqLimit > 0) || !(fullSpan > 0)) return contours;
 
@@ -1101,9 +1102,17 @@
                         const segment = [];
                         for (let i = 0; i <= segmentSamples; i++) {
                             const id = startId + (i / segmentSamples) * (endId - startId);
-                            const denom = torqueConstant * (this.psif + diff * id);
+                            const torqueFlux = this.psif + diff * id;
+                            const denom = torqueConstant * torqueFlux;
                             const iq = T / denom;
-                            if (Number.isFinite(iq) && Math.abs(iq) <= iqLimit + 1e-7) {
+                            const isPmAssistedMainBranch = Math.abs(diff) >= 1e-12 && torqueFlux > 0;
+                            const isWithinMainDisplayLimit = !isPmAssistedMainBranch
+                                || Math.hypot(id, iq) <= mainBranchDisplayLimit + 1e-7;
+                            if (
+                                Number.isFinite(iq)
+                                && Math.abs(iq) <= iqLimit + 1e-7
+                                && isWithinMainDisplayLimit
+                            ) {
                                 segment.push({ id, iq });
                             }
                         }

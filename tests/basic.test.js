@@ -168,6 +168,14 @@ test('IPMSM torque contours include both exact branches without crossing the asy
       assert.ok(contour.segments[1].some(point => point.id > 0));
       assert.ok(contour.segments[1].every(point => Math.sign(point.iq) === -direction));
 
+      const mainBranch = contour.segments.find(segment => (
+        motor.psif + diff * segment[Math.floor(segment.length / 2)].id > 0
+      ));
+      assert.ok(mainBranch);
+      assert.ok(mainBranch.every(point => (
+        Math.hypot(point.id, point.iq) <= motor.Imax * 1.02 + 1e-7
+      )));
+
       for (const segment of contour.segments) {
         for (const point of segment) {
           assert.ok(Math.abs(motor.calcTorque(point.id, point.iq) - contour.T) < 1e-9);
