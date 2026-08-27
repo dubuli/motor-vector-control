@@ -378,7 +378,10 @@
         .legend-dot.ellipse { background: rgba(245, 158, 11, 0.4); border: 1px solid var(--accent-voltage); }
         .legend-dot.mtpa { background: var(--accent-success); }
         .legend-dot.mtpv { background: var(--accent-purple); box-shadow: 0 0 8px var(--accent-purple); }
-        .legend-dot.torque { background: #94a3b8; box-shadow: 0 0 6px rgba(148, 163, 184, 0.65); }
+        .legend-dot.torque {
+            background: linear-gradient(90deg, #7dd3fc 0 50%, #fda4af 50% 100%);
+            box-shadow: 0 0 7px rgba(226, 232, 240, 0.65);
+        }
 
         /* LARGE CANVAS CONTAINER */
         .large-canvas-wrapper {
@@ -697,7 +700,7 @@
                         <div class="legend-item"><span class="legend-dot ellipse"></span>电压极限椭圆</div>
                         <div class="legend-item"><span class="legend-dot mtpa"></span>MTPA 轨迹</div>
                         <div class="legend-item"><span class="legend-dot mtpv"></span>MTPV 轨迹</div>
-                        <div class="legend-item"><span class="legend-dot torque"></span>等转矩线</div>
+                        <div class="legend-item"><span class="legend-dot torque"></span>±Te 等转矩线</div>
                     </div>
                 </div>
                 <div class="large-canvas-wrapper">
@@ -798,8 +801,8 @@
                 <p>2. <strong>同图显示与比例映射：</strong> 本页的 dq 电压、电流均采用相量峰值约定。直流母线电压通过理想 SVPWM 换算为相电压矢量上限 <code>U_max = U_dc / √3</code>。坐标轴以电流 <code>(A)</code> 为基准物理量，并按 <code>K_v = I_max / U_max</code> 映射电压矢量 <code>U_s</code> 与电压极限圆。</p>
                 <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。当 <code>Rs = 0</code> 且转速为零时该逆运算没有唯一解，页面会保留原电流并显示提示。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
-                <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
-                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.1 / 0.2 / … / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 按 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 分段绘制。正磁链主工作分支仅保留电流限幅附近的有效区，避免超限尾部形成射线束；右侧负磁链数学分支继续完整显示，并在奇点区域断开。</p>
+                <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。MTPA/MTPV 显示所选旋转方向对应的电动轨迹；正、负等转矩线则作为完整转矩图谱同时显示，不随转速方向翻转。</p>
+                <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线按 <code>±0.1 / ±0.2 / … / ±1.0 × Tmax</code> 均匀取值，并由 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 直接计算。常规 FOC 转矩图只保留 <code>ψf + (Ld−Lq)id &gt; 0</code> 的有效分支，因此正转时上半平面 <code>iq &gt; 0</code> 为正转矩，下半平面 <code>iq &lt; 0</code> 为负转矩。左侧超限尾部在电流圆附近裁剪，右侧按公式延伸到显示边界，并在磁链零点前停止。</p>
             </div>
 
         </main>
@@ -1017,21 +1020,56 @@
                 return this.getMTPAPointAtCurrent(this.Imax, torqueDirection).T;
             }
 
+            getMTPAPointAtTorque(targetTorque, torqueDirection = this.direction) {
+                const torqueSign = targetTorque < 0
+                    ? -1
+                    : (targetTorque > 0 ? 1 : (torqueDirection < 0 ? -1 : 1));
+                const targetMagnitude = Math.abs(targetTorque);
+                const peakPoint = this.getMTPAPointAtCurrent(this.Imax, torqueSign);
+                const peakMagnitude = Math.abs(peakPoint.T);
+
+                if (!(targetMagnitude > 0) || !(peakMagnitude > 0)) {
+                    return { id: 0, iq: 0, Is: 0, T: 0 };
+                }
+                if (targetMagnitude >= peakMagnitude) return peakPoint;
+
+                let lowCurrent = 0;
+                let highCurrent = this.Imax;
+                for (let iteration = 0; iteration < 64; iteration++) {
+                    const current = (lowCurrent + highCurrent) / 2;
+                    const point = this.getMTPAPointAtCurrent(current, torqueSign);
+                    if (Math.abs(point.T) < targetMagnitude) lowCurrent = current;
+                    else highCurrent = current;
+                }
+                return this.getMTPAPointAtCurrent(
+                    (lowCurrent + highCurrent) / 2,
+                    torqueSign
+                );
+            }
+
             getSuggestedTorqueOperatingPoints(count = 5, torqueDirection = this.direction) {
                 const levelCount = Math.max(0, Math.floor(count));
-                if (!(this.Imax > 0) || levelCount === 0) return [];
+                const peakTorque = this.getCurrentLimitedPeakTorque(torqueDirection);
+                if (!(Math.abs(peakTorque) > 0) || levelCount === 0) return [];
 
                 return Array.from(
                     { length: levelCount },
-                    (_, index) => this.getMTPAPointAtCurrent(
-                        this.Imax * ((index + 1) / levelCount),
+                    (_, index) => this.getMTPAPointAtTorque(
+                        peakTorque * ((index + 1) / levelCount),
                         torqueDirection
                     )
                 );
             }
 
             getSuggestedTorqueLevels(count = 5, torqueDirection = this.direction) {
-                return this.getSuggestedTorqueOperatingPoints(count, torqueDirection).map(point => point.T);
+                const levelCount = Math.max(0, Math.floor(count));
+                const peakTorque = this.getCurrentLimitedPeakTorque(torqueDirection);
+                if (!(Math.abs(peakTorque) > 0) || levelCount === 0) return [];
+
+                return Array.from(
+                    { length: levelCount },
+                    (_, index) => peakTorque * ((index + 1) / levelCount)
+                );
             }
 
             getSuggestedTorqueContours(
@@ -1041,9 +1079,10 @@
                 idMax = this.Imax * 1.6,
                 samples = 480
             ) {
-                const anchors = this.getSuggestedTorqueOperatingPoints(count, torqueDirection);
+                const torqueLevels = this.getSuggestedTorqueLevels(count, torqueDirection);
+                const anchors = torqueLevels.map(T => this.getMTPAPointAtTorque(T, torqueDirection));
                 const contours = this.getTorqueContours(
-                    anchors.map(point => point.T),
+                    torqueLevels,
                     idMin,
                     idMax,
                     samples,
@@ -1053,6 +1092,21 @@
                     contour.isPeak = index === contours.length - 1;
                 });
                 return contours;
+            }
+
+            getBidirectionalTorqueContours(
+                count = 5,
+                idMin = -this.Imax * 1.6,
+                idMax = this.Imax * 1.6,
+                samples = 480
+            ) {
+                // Constant-torque loci depend on current and motor parameters,
+                // not on mechanical speed direction. Render both signed
+                // families to preserve the full topology of the torque map.
+                return [
+                    ...this.getSuggestedTorqueContours(count, 1, idMin, idMax, samples),
+                    ...this.getSuggestedTorqueContours(count, -1, idMin, idMax, samples)
+                ];
             }
 
             getTorqueContours(
@@ -1072,6 +1126,7 @@
 
                 torques.forEach((T, torqueIndex) => {
                     if (!Number.isFinite(T) || Math.abs(T) < 1e-12) return;
+                    const anchor = anchors[torqueIndex] || null;
 
                     let intervals = [];
                     if (Math.abs(diff) < 1e-12) {
@@ -1080,19 +1135,14 @@
                             intervals = [[idMin, idMax]];
                         }
                     } else {
-                        // |iq| <= iqLimit leaves two visible algebraic branches
-                        // around the torque-flux asymptote. Sample them as
-                        // separate segments so the renderer never draws a
-                        // false line through ψf + (Ld - Lq)id = 0.
+                        // Use the normal FOC branch where torque-flux remains
+                        // positive. This keeps torque sign aligned with iq and
+                        // stops the curve before the torque-flux singularity.
                         const minimumFluxMagnitude = Math.abs(T) / (torqueConstant * iqLimit);
-                        const firstBoundary = (minimumFluxMagnitude - this.psif) / diff;
-                        const secondBoundary = (-minimumFluxMagnitude - this.psif) / diff;
-                        const gapStart = Math.min(firstBoundary, secondBoundary);
-                        const gapEnd = Math.max(firstBoundary, secondBoundary);
-                        intervals = [
-                            [idMin, Math.min(idMax, gapStart)],
-                            [Math.max(idMin, gapEnd), idMax]
-                        ];
+                        const visibleBoundary = (minimumFluxMagnitude - this.psif) / diff;
+                        intervals = diff < 0
+                            ? [[idMin, Math.min(idMax, visibleBoundary)]]
+                            : [[Math.max(idMin, visibleBoundary), idMax]];
                     }
 
                     const segments = [];
@@ -1105,12 +1155,16 @@
                             const torqueFlux = this.psif + diff * id;
                             const denom = torqueConstant * torqueFlux;
                             const iq = T / denom;
-                            const isPmAssistedMainBranch = Math.abs(diff) >= 1e-12 && torqueFlux > 0;
-                            const isWithinMainDisplayLimit = !isPmAssistedMainBranch
+                            const isFarFluxTail = anchor
+                                && Math.abs(diff) >= 1e-12
+                                && diff * (id - anchor.id) > 0;
+                            const isWithinMainDisplayLimit = !isFarFluxTail
                                 || Math.hypot(id, iq) <= mainBranchDisplayLimit + 1e-7;
                             if (
                                 Number.isFinite(iq)
                                 && Math.abs(iq) <= iqLimit + 1e-7
+                                && torqueFlux > 0
+                                && Math.sign(iq) === Math.sign(T)
                                 && isWithinMainDisplayLimit
                             ) {
                                 segment.push({ id, iq });
@@ -1119,7 +1173,6 @@
                         if (segment.length > 1) segments.push(segment);
                     }
 
-                    const anchor = anchors[torqueIndex];
                     if (anchor && Number.isFinite(anchor.id) && Number.isFinite(anchor.iq)) {
                         const targetSegment = segments.find(segment => (
                             anchor.id >= segment[0].id - 1e-9 &&
@@ -1419,16 +1472,17 @@
             drawTorqueContours(contours) {
                 const ctx = this.ctx;
                 ctx.save();
-                ctx.setLineDash([2, 4]);
 
                 for (const c of contours) {
                     const segments = c.segments || [c.points.filter(point => point !== null)];
                     const visiblePoints = segments.flat();
                     if (visiblePoints.length < 2) continue;
 
-                    ctx.strokeStyle = c.isPeak
-                        ? 'rgba(148, 163, 184, 0.86)'
-                        : 'rgba(148, 163, 184, 0.68)';
+                    const isPositiveTorque = c.T > 0;
+                    ctx.setLineDash([]);
+                    ctx.strokeStyle = isPositiveTorque
+                        ? (c.isPeak ? 'rgba(125, 211, 252, 0.96)' : 'rgba(125, 211, 252, 0.76)')
+                        : (c.isPeak ? 'rgba(253, 164, 175, 0.94)' : 'rgba(253, 164, 175, 0.70)');
                     ctx.lineWidth = c.isPeak ? 1.5 : 1.2;
                     ctx.beginPath();
                     for (const segment of segments) {
@@ -1443,7 +1497,7 @@
                     const labelPoint = c.anchor || visiblePoints[Math.floor(visiblePoints.length / 2)];
                     const { px, py } = this.toScreen(labelPoint.id, labelPoint.iq);
                     ctx.font = '9px sans-serif';
-                    ctx.fillStyle = c.isPeak ? '#cbd5e1' : '#94a3b8';
+                    ctx.fillStyle = isPositiveTorque ? '#bae6fd' : '#fecdd3';
                     const digits = Math.abs(c.T) < 10 ? 2 : (Math.abs(c.T) < 100 ? 1 : 0);
                     ctx.fillText(`${c.T.toFixed(digits)}Nm`, px + 4, py - 2);
                 }
@@ -1928,8 +1982,8 @@
                 const mtpvPts = m.getMTPVCurve(m.Imax, 240, m.direction);
                 r.drawMTPV(mtpvPts, '#a855f7');
 
-                // 7. Torque Contours (MTPA-anchored, including exact Imax peak)
-                const contours = m.getSuggestedTorqueContours(10, m.direction);
+                // 7. Signed torque map. Te(id, iq) is independent of speed direction.
+                const contours = m.getBidirectionalTorqueContours(10);
                 r.drawTorqueContours(contours);
 
                 // 8. Draw Current Vector Is

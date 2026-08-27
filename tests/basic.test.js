@@ -152,43 +152,59 @@ test('MTPV condition and torque-contour anchors remain exact', () => {
   }
 });
 
-test('IPMSM torque contours include both exact branches without crossing the asymptote', () => {
+test('IPMSM signed torque contours stay aligned with iq on the normal FOC branch', () => {
   const motor = new MotorMathEngine(presets.ipmsm.params);
   const diff = motor.Ld - motor.Lq;
   const asymptoteId = -motor.psif / diff;
 
   for (const direction of [1, -1]) {
     const contours = motor.getSuggestedTorqueContours(10, direction);
+    const peakTorque = motor.getCurrentLimitedPeakTorque(direction);
     assert.equal(contours.length, 10);
 
-    for (const contour of contours) {
-      assert.equal(contour.segments.length, 2);
+    contours.forEach((contour, index) => {
+      assert.ok(Math.abs(contour.T - peakTorque * ((index + 1) / 10)) < 1e-10);
+      assert.equal(contour.segments.length, 1);
       assert.ok(contour.segments[0].at(-1).id < asymptoteId);
-      assert.ok(contour.segments[1][0].id > asymptoteId);
-      assert.ok(contour.segments[1].some(point => point.id > 0));
-      assert.ok(contour.segments[1].every(point => Math.sign(point.iq) === -direction));
-
-      const mainBranch = contour.segments.find(segment => (
-        motor.psif + diff * segment[Math.floor(segment.length / 2)].id > 0
-      ));
-      assert.ok(mainBranch);
-      assert.ok(mainBranch.every(point => (
-        Math.hypot(point.id, point.iq) <= motor.Imax * 1.02 + 1e-7
-      )));
+      if (index < 9) assert.ok(contour.segments[0].some(point => point.id > 0));
 
       for (const segment of contour.segments) {
         for (const point of segment) {
+          assert.ok(motor.psif + diff * point.id > 0);
+          assert.equal(Math.sign(point.iq), direction);
           assert.ok(Math.abs(motor.calcTorque(point.id, point.iq) - contour.T) < 1e-9);
+          if (diff * (point.id - contour.anchor.id) > 0) {
+            assert.ok(Math.hypot(point.id, point.iq) <= motor.Imax * 1.02 + 1e-7);
+          }
         }
       }
-    }
+    });
   }
+
+  const signedMap = motor.getBidirectionalTorqueContours(10);
+  assert.equal(signedMap.length, 20);
+  assert.equal(signedMap.filter(contour => contour.T > 0).length, 10);
+  assert.equal(signedMap.filter(contour => contour.T < 0).length, 10);
+  assert.ok(signedMap.filter(contour => contour.T > 0).every(contour => (
+    contour.segments.flat().every(point => point.iq > 0)
+  )));
+  assert.ok(signedMap.filter(contour => contour.T < 0).every(contour => (
+    contour.segments.flat().every(point => point.iq < 0)
+  )));
 });
 
-test('torque-contour rendering uses ten levels without a white peak line', () => {
-  assert.match(html, /getSuggestedTorqueContours\(10, m\.direction\)/);
+test('torque map renders both signs independently of speed direction', () => {
+  assert.match(html, /getBidirectionalTorqueContours\(10\)/);
+  assert.doesNotMatch(html, /getSuggestedTorqueContours\(10, m\.direction\)/);
   assert.doesNotMatch(html, /c\.isPeak \? '#e2e8f0'/);
-  assert.match(html, /0\.1 \/ 0\.2 \/ … \/ 1\.0 × Imax/);
+  assert.match(html, /±0\.1 \/ ±0\.2 \/ … \/ ±1\.0 × Tmax/);
+
+  const forwardMotor = new MotorMathEngine({ ...presets.ipmsm.params, direction: 1 });
+  const reverseMotor = new MotorMathEngine({ ...presets.ipmsm.params, direction: -1 });
+  assert.equal(
+    JSON.stringify(forwardMotor.getBidirectionalTorqueContours(4)),
+    JSON.stringify(reverseMotor.getBidirectionalTorqueContours(4))
+  );
 });
 
 test('singular inverse is reported and power-factor angle is normalized', () => {
