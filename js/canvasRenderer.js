@@ -318,35 +318,29 @@ export class CanvasRenderer {
     drawTorqueContours(contours, color = 'rgba(148, 163, 184, 0.4)') {
         const ctx = this.ctx;
         ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1;
         ctx.setLineDash([2, 4]);
 
         for (const contour of contours) {
-            const visiblePoints = contour.points.filter(point => point !== null);
+            const segments = contour.segments || [contour.points.filter(point => point !== null)];
+            const visiblePoints = segments.flat();
             if (visiblePoints.length < 2) continue;
+
+            ctx.strokeStyle = contour.isPeak ? '#e2e8f0' : color;
+            ctx.lineWidth = contour.isPeak ? 1.8 : 1;
             ctx.beginPath();
-            let segmentStarted = false;
-            for (let i = 0; i < contour.points.length; i++) {
-                const point = contour.points[i];
-                if (point === null) {
-                    segmentStarted = false;
-                    continue;
-                }
-                const { px, py } = this.toScreen(point.id, point.iq);
-                if (!segmentStarted) {
-                    ctx.moveTo(px, py);
-                    segmentStarted = true;
-                } else {
-                    ctx.lineTo(px, py);
+            for (const segment of segments) {
+                for (let i = 0; i < segment.length; i++) {
+                    const { px, py } = this.toScreen(segment[i].id, segment[i].iq);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
                 }
             }
             ctx.stroke();
 
-            const mid = visiblePoints[Math.floor(visiblePoints.length / 2)];
-            const { px, py } = this.toScreen(mid.id, mid.iq);
+            const labelPoint = contour.anchor || visiblePoints[Math.floor(visiblePoints.length / 2)];
+            const { px, py } = this.toScreen(labelPoint.id, labelPoint.iq);
             ctx.font = '9px sans-serif';
-            ctx.fillStyle = '#64748b';
+            ctx.fillStyle = contour.isPeak ? '#e2e8f0' : '#64748b';
             const digits = Math.abs(contour.T) < 10 ? 2 : (Math.abs(contour.T) < 100 ? 1 : 0);
             ctx.fillText(`${contour.T.toFixed(digits)}Nm`, px + 4, py - 2);
         }

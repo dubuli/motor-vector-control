@@ -210,16 +210,16 @@ export class MotorMath {
     }
 
     /**
-     * Exact peak torque on the current-limit circle. Both stationary points are
-     * checked because unusual saliency/flux combinations can move the maximum
-     * to the other constant-torque branch.
+     * Exact MTPA operating point for a specified current magnitude.
      */
-    getCurrentLimitedPeakTorque(torqueDirection = this.direction) {
+    getMTPAPointAtCurrent(currentMagnitude = this.Imax, torqueDirection = this.direction) {
         const torqueSign = torqueDirection < 0 ? -1 : 1;
-        const current = this.Imax;
+        const current = Math.abs(currentMagnitude);
         const diff = this.Ld - this.Lq;
 
-        if (!(current > 0) || !(this.poles > 0)) return 0;
+        if (!(current > 0) || !(this.poles > 0)) {
+            return { id: 0, iq: 0, Is: 0, T: 0 };
+        }
 
         const candidates = [0];
         if (Math.abs(diff) > 1e-12) {
@@ -230,57 +230,154 @@ export class MotorMath {
             );
         }
 
-        let peakMagnitude = 0;
+        let bestPoint = null;
+        let bestDirectedTorque = -Infinity;
         for (const id of candidates) {
             if (!Number.isFinite(id) || Math.abs(id) > current + 1e-9) continue;
             const iqMagnitude = Math.sqrt(Math.max(0, current * current - id * id));
-            const torqueMagnitude = Math.abs(this.calcTorque(id, iqMagnitude));
-            peakMagnitude = Math.max(peakMagnitude, torqueMagnitude);
+            const torqueFlux = this.psif + diff * id;
+            // Keep the normal PM-assisted branch. Continuing through zero
+            // torque flux would reverse iq and create the unwanted mirrored
+            // branch in the opposite q half-plane.
+            if (!(torqueFlux > 1e-12)) continue;
+            const iq = torqueSign * iqMagnitude;
+            const T = this.calcTorque(id, iq);
+            const directedTorque = torqueSign * T;
+            if (directedTorque > bestDirectedTorque) {
+                bestDirectedTorque = directedTorque;
+                bestPoint = { id, iq, Is: current, T };
+            }
         }
-        return torqueSign * peakMagnitude;
+        return bestPoint || { id: 0, iq: torqueSign * current, Is: current, T: this.calcTorque(0, torqueSign * current) };
     }
 
     /**
-     * Generate evenly distributed levels and always include the exact
-     * current-limited peak as the final contour.
+     * Exact peak torque on the current-limit circle.
      */
-    getSuggestedTorqueLevels(count = 5, torqueDirection = this.direction) {
+    getCurrentLimitedPeakTorque(torqueDirection = this.direction) {
+        return this.getMTPAPointAtCurrent(this.Imax, torqueDirection).T;
+    }
+
+    /**
+     * Use evenly spaced current magnitudes on MTPA to obtain physically
+     * meaningful torque levels. The final level is the exact Imax peak.
+     */
+    getSuggestedTorqueOperatingPoints(count = 5, torqueDirection = this.direction) {
         const levelCount = Math.max(0, Math.floor(count));
-        const peakTorque = this.getCurrentLimitedPeakTorque(torqueDirection);
-        if (!(Math.abs(peakTorque) > 0) || levelCount === 0) return [];
+        if (!(this.Imax > 0) || levelCount === 0) return [];
 
         return Array.from(
             { length: levelCount },
-            (_, index) => peakTorque * ((index + 1) / levelCount)
+            (_, index) => this.getMTPAPointAtCurrent(
+                this.Imax * ((index + 1) / levelCount),
+                torqueDirection
+            )
         );
+    }
+
+    getSuggestedTorqueLevels(count = 5, torqueDirection = this.direction) {
+        return this.getSuggestedTorqueOperatingPoints(count, torqueDirection).map(point => point.T);
+    }
+
+    getSuggestedTorqueContours(
+        count = 5,
+        torqueDirection = this.direction,
+        idMin = -this.Imax * 1.6,
+        idMax = this.Imax * 1.6,
+        samples = 480
+    ) {
+        const anchors = this.getSuggestedTorqueOperatingPoints(count, torqueDirection);
+        const contours = this.getTorqueContours(
+            anchors.map(point => point.T),
+            idMin,
+            idMax,
+            samples,
+            anchors
+        );
+        contours.forEach((contour, index) => {
+            contour.isPeak = index === contours.length - 1;
+        });
+        return contours;
     }
 
     /**
      * Generate Constant Torque Contour curves in Current Plane
      */
-    getTorqueContours(torques = [], idMin = -this.Imax * 1.6, idMax = this.Imax * 1.6, samples = 360) {
+    getTorqueContours(
+        torques = [],
+        idMin = -this.Imax * 1.6,
+        idMax = this.Imax * 1.6,
+        samples = 480,
+        anchors = []
+    ) {
         const contours = [];
         const diff = this.Ld - this.Lq;
+        const torqueConstant = 1.5 * this.poles;
+        const iqLimit = this.Imax * 1.6;
+        const fullSpan = idMax - idMin;
 
-        for (const T of torques) {
-            const pts = [];
-            for (let i = 0; i <= samples; i++) {
-                const id = idMin + (i / samples) * (idMax - idMin);
-                const denom = 1.5 * this.poles * (this.psif + diff * id);
-                if (Math.abs(denom) > 1e-5) {
+        if (!(torqueConstant > 0) || !(iqLimit > 0) || !(fullSpan > 0)) return contours;
+
+        torques.forEach((T, torqueIndex) => {
+            if (!Number.isFinite(T) || Math.abs(T) < 1e-12) return;
+
+            let intervals = [];
+            if (Math.abs(diff) < 1e-12) {
+                const iq = T / (torqueConstant * this.psif);
+                if (this.psif > 0 && Number.isFinite(iq) && Math.abs(iq) <= iqLimit + 1e-9) {
+                    intervals = [[idMin, idMax]];
+                }
+            } else {
+                // Draw only the PM-assisted branch where torque flux is
+                // positive and iq has the requested torque sign. The algebraic
+                // branch beyond zero torque flux reverses iq and is not part of
+                // the normal motoring/generating operating region.
+                const minimumFluxMagnitude = Math.abs(T) / (torqueConstant * iqLimit);
+                const visibleBoundary = (minimumFluxMagnitude - this.psif) / diff;
+                if (diff < 0) {
+                    intervals = [[idMin, Math.min(idMax, visibleBoundary)]];
+                } else {
+                    intervals = [[Math.max(idMin, visibleBoundary), idMax]];
+                }
+            }
+
+            const segments = [];
+            for (const [startId, endId] of intervals) {
+                if (!(endId > startId)) continue;
+                const segmentSamples = Math.max(2, Math.ceil(samples * ((endId - startId) / fullSpan)));
+                const segment = [];
+                for (let i = 0; i <= segmentSamples; i++) {
+                    const id = startId + (i / segmentSamples) * (endId - startId);
+                    const denom = torqueConstant * (this.psif + diff * id);
                     const iq = T / denom;
-                    if (Number.isFinite(iq) && Math.abs(iq) <= this.Imax * 1.6) {
-                        pts.push({ id, iq });
-                        continue;
+                    if (Number.isFinite(iq) && Math.abs(iq) <= iqLimit + 1e-7) {
+                        segment.push({ id, iq });
                     }
                 }
-                if (pts.length > 0 && pts[pts.length - 1] !== null) pts.push(null);
+                if (segment.length > 1) segments.push(segment);
             }
-            while (pts[pts.length - 1] === null) pts.pop();
-            if (pts.length > 0) {
-                contours.push({ T, points: pts });
+
+            const anchor = anchors[torqueIndex];
+            if (anchor && Number.isFinite(anchor.id) && Number.isFinite(anchor.iq)) {
+                const targetSegment = segments.find(segment => (
+                    anchor.id >= segment[0].id - 1e-9 &&
+                    anchor.id <= segment[segment.length - 1].id + 1e-9
+                ));
+                if (targetSegment) {
+                    targetSegment.push({ id: anchor.id, iq: anchor.iq, isAnchor: true });
+                    targetSegment.sort((a, b) => a.id - b.id);
+                }
             }
-        }
+
+            if (segments.length > 0) {
+                const points = [];
+                segments.forEach((segment, segmentIndex) => {
+                    if (segmentIndex > 0) points.push(null);
+                    points.push(...segment);
+                });
+                contours.push({ T, segments, points, anchor: anchor || null });
+            }
+        });
         return contours;
     }
 }
