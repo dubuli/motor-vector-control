@@ -468,6 +468,42 @@
             gap: 4px;
         }
 
+        .alert-badge.warning {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.35);
+            color: var(--accent-voltage);
+        }
+
+        @media (max-width: 900px) {
+            .header,
+            .canvas-header {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .presets-group,
+            .canvas-legend {
+                flex-wrap: wrap;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .header,
+            .main-container {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .brand-text p {
+                display: none;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
         .theory-section {
             font-size: 12px;
             line-height: 1.6;
@@ -667,6 +703,7 @@
                     <div>
                         <span id="alert-voltage" class="alert-badge" style="display:none;">⚠️ 超出电压极限!</span>
                         <span id="alert-current" class="alert-badge" style="display:none;">⚠️ 超出电流极限!</span>
+                        <span id="alert-inverse" class="alert-badge warning" style="display:none;">⚠️ 当前参数下电压无法唯一反解电流</span>
                     </div>
                 </div>
                 
@@ -705,7 +742,7 @@
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-label">输入电功率 Pin</div>
+                        <div class="metric-label">定子有功功率 Pe</div>
                         <div class="metric-value" id="val-pin">0.0 W</div>
                     </div>
 
@@ -715,7 +752,7 @@
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-label">机械输出功率 Pmech</div>
+                        <div class="metric-label">机械功率 Pmech</div>
                         <div class="metric-value highlight" id="val-pmech">0.0 W</div>
                     </div>
 
@@ -725,7 +762,7 @@
                     </div>
 
                     <div class="metric-card">
-                        <div class="metric-label">功角 δ (Us - Is 夹角)</div>
+                        <div class="metric-label">功率因数角 φ (Us - Is)</div>
                         <div class="metric-value" id="val-pangle">0.0°</div>
                     </div>
 
@@ -749,8 +786,8 @@
                     <span>📖 说明与数学原理</span>
                 </div>
                 <p>1. <strong>无需任何后台：</strong> 本网页采用纯原生 JavaScript 编写，无需 Python 或 Node.js 后台支持。双击 <code>index.html</code> 即可在浏览器中完美运行。</p>
-                <p>2. <strong>同图显示与比例映射：</strong> 直流母线电压通过理想 SVPWM 换算为相电压矢量上限 <code>U_max = U_dc / √3</code>。坐标轴以电流 <code>(A)</code> 为基准物理量，并按 <code>K_v = I_max / U_max</code> 映射电压矢量 <code>U_s</code> 与电压极限圆。</p>
-                <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。</p>
+                <p>2. <strong>同图显示与比例映射：</strong> 本页的 dq 电压、电流均采用相量峰值约定。直流母线电压通过理想 SVPWM 换算为相电压矢量上限 <code>U_max = U_dc / √3</code>。坐标轴以电流 <code>(A)</code> 为基准物理量，并按 <code>K_v = I_max / U_max</code> 映射电压矢量 <code>U_s</code> 与电压极限圆。</p>
+                <p>3. <strong>随动计算：</strong> 拖拽蓝色 <code>Is</code> 端点时正向求解电压 <code>Us</code>；拖拽橙色 <code>Us</code> 端点时通过矩阵逆运算反向求解电流 <code>(id, iq)</code>。当 <code>Rs = 0</code> 且转速为零时该逆运算没有唯一解，页面会保留原电流并显示提示。</p>
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。反转时 MTPA 曲线和转矩等值线会同步镜像到负 q 轴。</p>
                 <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线取 <code>0.2 / 0.4 / 0.6 / 0.8 / 1.0 × Imax</code> 对应的 MTPA 转矩，并精确经过各自的 MTPA 切点；IPMSM 仅绘制 <code>ψf + (Ld−Lq)·id &gt; 0</code> 且 <code>iq</code> 与转矩方向同号的主工作分支，该分支会正常延伸到右半平面。</p>
@@ -805,10 +842,15 @@
 
             solveCurrent(ud, uq) {
                 const D = this.Rs * this.Rs + this.omega_e * this.omega_e * this.Ld * this.Lq;
-                if (D === 0) return { id: 0, iq: 0, Is: 0 };
+                if (!Number.isFinite(D) || D < 1e-18) return null;
                 const id = (this.Rs * ud + this.omega_e * this.Lq * (uq - this.omega_e * this.psif)) / D;
                 const iq = (this.Rs * (uq - this.omega_e * this.psif) - this.omega_e * this.Ld * ud) / D;
                 return { id, iq, Is: Math.hypot(id, iq) };
+            }
+
+            canSolveCurrent() {
+                const D = this.Rs * this.Rs + this.omega_e * this.omega_e * this.Ld * this.Lq;
+                return Number.isFinite(D) && D >= 1e-18;
             }
 
             calcTorque(id, iq) {
@@ -824,8 +866,9 @@
                 const Ploss = 1.5 * this.Rs * (id * id + iq * iq);
                 const Pmech = Pin - Ploss;
                 const S = 1.5 * Us * Is;
-                const powerFactor = S > 1e-6 ? Math.min(1.0, Math.max(-1.0, Pin / S)) : 1.0;
-                const powerAngle = (Math.atan2(uq, ud) - Math.atan2(iq, id)) * (180 / Math.PI);
+                const powerFactor = S > 1e-6 ? Math.min(1.0, Math.max(-1.0, Pin / S)) : null;
+                const rawPowerAngle = (Math.atan2(uq, ud) - Math.atan2(iq, id)) * (180 / Math.PI);
+                const powerAngle = ((rawPowerAngle + 180) % 360 + 360) % 360 - 180;
                 const directionLabel = this.direction > 0 ? '正转' : '反转';
                 const speedTorqueProduct = this.rpm * Te;
                 let operationMode = '静止';
@@ -849,8 +892,8 @@
                     operationMode,
                     isVoltageExceeded: Us > this.Umax + 1e-3,
                     isCurrentExceeded: Is > this.Imax + 1e-3,
-                    voltageRatio: (Us / this.Umax) * 100,
-                    currentRatio: (Is / this.Imax) * 100
+                    voltageRatio: this.Umax > 0 ? (Us / this.Umax) * 100 : Infinity,
+                    currentRatio: this.Imax > 0 ? (Is / this.Imax) * 100 : Infinity
                 };
             }
 
@@ -865,6 +908,7 @@
                     const ud = this.Umax * Math.cos(angle);
                     const uq = this.Umax * Math.sin(angle);
                     const curr = this.solveCurrent(ud, uq);
+                    if (!curr) return [];
                     points.push({ id: curr.id, iq: curr.iq });
                 }
                 return points;
@@ -1078,7 +1122,6 @@
                 this.handleRadius = 10;
                 this.hoveredHandle = null; // 'current' or 'voltage' or null
                 this.resize();
-                window.addEventListener('resize', () => this.resize());
             }
 
             resize() {
@@ -1123,8 +1166,10 @@
                 ctx.setLineDash([4, 4]);
 
                 const step = this.getNiceStep(range);
-                const startVal = Math.floor((-this.width / 2 / this.scale) / step) * step;
-                const endVal = Math.ceil((this.width / 2 / this.scale) / step) * step;
+                const startX = Math.floor((-this.width / 2 / this.scale) / step) * step;
+                const endX = Math.ceil((this.width / 2 / this.scale) / step) * step;
+                const startY = Math.floor((-this.height / 2 / this.scale) / step) * step;
+                const endY = Math.ceil((this.height / 2 / this.scale) / step) * step;
 
                 ctx.font = '11px sans-serif';
                 ctx.fillStyle = '#64748b';
@@ -1132,7 +1177,7 @@
                 ctx.textBaseline = 'middle';
 
                 // Grid lines & Current (A) labels
-                for (let val = startVal; val <= endVal; val += step) {
+                for (let val = startX; val <= endX; val += step) {
                     if (Math.abs(val) < 1e-4) continue;
                     const { px } = this.toScreen(val, 0);
                     ctx.beginPath();
@@ -1142,11 +1187,11 @@
                     ctx.fillText(`${val}A`, px, this.originY + 16);
                 }
 
-                for (let val = startVal; val <= endVal; val += step) {
+                for (let val = startY; val <= endY; val += step) {
                     if (Math.abs(val) < 1e-4) continue;
                     const { py } = this.toScreen(0, val);
                     ctx.beginPath();
-                    ctx.moveTo(0, this.width);
+                    ctx.moveTo(0, py);
                     ctx.lineTo(this.width, py);
                     ctx.stroke();
                     ctx.fillText(`${val}A`, this.originX - 25, py);
@@ -1249,6 +1294,7 @@
             }
 
             drawMarker(x, y, label, color = '#ef4444') {
+                if (!Number.isFinite(x) || !Number.isFinite(y)) return;
                 const ctx = this.ctx;
                 ctx.save();
                 const { px, py } = this.toScreen(x, y);
@@ -1473,7 +1519,8 @@
                     vPercent: document.getElementById('percent-voltage'),
                     cPercent: document.getElementById('percent-current'),
                     alertVoltage: document.getElementById('alert-voltage'),
-                    alertCurrent: document.getElementById('alert-current')
+                    alertCurrent: document.getElementById('alert-current'),
+                    alertInverse: document.getElementById('alert-inverse')
                 };
 
                 this.directionDOM = {
@@ -1488,6 +1535,7 @@
                 this.renderer = new UnifiedCanvasRenderer(canvas);
 
                 this.activeDrag = null; // 'current' or 'voltage'
+                this.resizeFrame = null;
 
                 // Mouse & Touch events for Dragging both handles on the same canvas
                 const c = canvas;
@@ -1502,6 +1550,15 @@
                     if (e.touches.length === 1 && this.activeDrag) { this.handleMove(e.touches[0]); e.preventDefault(); }
                 }, { passive: false });
                 window.addEventListener('touchend', () => this.handleUp());
+
+                window.addEventListener('resize', () => {
+                    if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
+                    this.resizeFrame = requestAnimationFrame(() => {
+                        this.resizeFrame = null;
+                        this.renderer.resize();
+                        this.renderAll();
+                    });
+                });
             }
 
             getCanvasPos(e) {
@@ -1545,8 +1602,10 @@
                 
                 if (!this.activeDrag) {
                     const hover = this.detectHandleHover(px, py);
+                    const hoverChanged = hover !== this.renderer.hoveredHandle;
                     this.renderer.hoveredHandle = hover;
                     this.renderer.canvas.style.cursor = hover ? 'grab' : 'default';
+                    if (hoverChanged) this.renderAll();
                 } else {
                     const world = this.renderer.toWorld(px, py);
                     if (this.activeDrag === 'current') {
@@ -1556,11 +1615,15 @@
                         this.state.ud = volt.ud;
                         this.state.uq = volt.uq;
                     } else if (this.activeDrag === 'voltage') {
-                        this.state.ud = world.x / this.Kv;
-                        this.state.uq = world.y / this.Kv;
-                        const curr = this.motor.solveCurrent(this.state.ud, this.state.uq);
-                        this.state.id = curr.id;
-                        this.state.iq = curr.iq;
+                        const nextUd = world.x / this.Kv;
+                        const nextUq = world.y / this.Kv;
+                        const curr = this.motor.solveCurrent(nextUd, nextUq);
+                        if (curr) {
+                            this.state.ud = nextUd;
+                            this.state.uq = nextUq;
+                            this.state.id = curr.id;
+                            this.state.iq = curr.iq;
+                        }
                     }
                     this.renderAll();
                 }
@@ -1569,8 +1632,32 @@
             handleUp() {
                 if (this.activeDrag) {
                     this.activeDrag = null;
-                    this.renderer.canvas.style.cursor = this.renderer.hoveredHandle ? 'grab' : 'default';
+                    this.renderer.hoveredHandle = null;
+                    this.renderer.canvas.style.cursor = 'default';
+                    this.renderAll();
                 }
+            }
+
+            readBoundedInput(key, fallback, integer = false) {
+                const input = this.inputs[key];
+                let value = Number(input.value);
+                if (!Number.isFinite(value)) value = fallback;
+
+                const min = Number(input.min);
+                const max = Number(input.max);
+                if (Number.isFinite(min)) value = Math.max(min, value);
+                if (Number.isFinite(max)) value = Math.min(max, value);
+                if (integer) value = Math.round(value);
+
+                input.value = String(value);
+                const slider = this.inputs[`${key}_slider`];
+                if (slider) slider.value = String(value);
+                return value;
+            }
+
+            readFiniteVectorInput(input, fallback) {
+                const value = Number(input.value);
+                return Number.isFinite(value) ? value : fallback;
             }
 
             bindEvents() {
@@ -1579,7 +1666,7 @@
                     const num = this.inputs[key];
                     const slider = this.inputs[`${key}_slider`];
                     if (num && slider) {
-                        num.addEventListener('input', () => { slider.value = num.value; this.onParamsChanged(); });
+                        num.addEventListener('change', () => { slider.value = num.value; this.onParamsChanged(); });
                         slider.addEventListener('input', () => { num.value = slider.value; this.onParamsChanged(); });
                     }
                 });
@@ -1587,27 +1674,33 @@
                 if (this.inputs.poles) this.inputs.poles.addEventListener('change', () => this.onParamsChanged());
 
                 this.inputs.id_input.addEventListener('change', () => {
-                    this.state.id = parseFloat(this.inputs.id_input.value) || 0;
+                    this.state.id = this.readFiniteVectorInput(this.inputs.id_input, this.state.id);
                     const volt = this.motor.solveVoltage(this.state.id, this.state.iq);
                     this.state.ud = volt.ud; this.state.uq = volt.uq;
                     this.renderAll();
                 });
                 this.inputs.iq_input.addEventListener('change', () => {
-                    this.state.iq = parseFloat(this.inputs.iq_input.value) || 0;
+                    this.state.iq = this.readFiniteVectorInput(this.inputs.iq_input, this.state.iq);
                     const volt = this.motor.solveVoltage(this.state.id, this.state.iq);
                     this.state.ud = volt.ud; this.state.uq = volt.uq;
                     this.renderAll();
                 });
                 this.inputs.ud_input.addEventListener('change', () => {
-                    this.state.ud = parseFloat(this.inputs.ud_input.value) || 0;
-                    const curr = this.motor.solveCurrent(this.state.ud, this.state.uq);
-                    this.state.id = curr.id; this.state.iq = curr.iq;
+                    const nextUd = this.readFiniteVectorInput(this.inputs.ud_input, this.state.ud);
+                    const curr = this.motor.solveCurrent(nextUd, this.state.uq);
+                    if (curr) {
+                        this.state.ud = nextUd;
+                        this.state.id = curr.id; this.state.iq = curr.iq;
+                    }
                     this.renderAll();
                 });
                 this.inputs.uq_input.addEventListener('change', () => {
-                    this.state.uq = parseFloat(this.inputs.uq_input.value) || 0;
-                    const curr = this.motor.solveCurrent(this.state.ud, this.state.uq);
-                    this.state.id = curr.id; this.state.iq = curr.iq;
+                    const nextUq = this.readFiniteVectorInput(this.inputs.uq_input, this.state.uq);
+                    const curr = this.motor.solveCurrent(this.state.ud, nextUq);
+                    if (curr) {
+                        this.state.uq = nextUq;
+                        this.state.id = curr.id; this.state.iq = curr.iq;
+                    }
                     this.renderAll();
                 });
 
@@ -1626,22 +1719,22 @@
 
             setDirection(direction) {
                 const nextDirection = direction < 0 ? -1 : 1;
-                if (nextDirection === this.direction) return;
+                if (nextDirection === this.direction && nextDirection === this.motor.direction) return;
                 this.direction = nextDirection;
                 this.onParamsChanged();
             }
 
             onParamsChanged() {
                 const p = {
-                    Rs: parseFloat(this.inputs.Rs.value),
-                    Ld: parseFloat(this.inputs.Ld.value),
-                    Lq: parseFloat(this.inputs.Lq.value),
-                    psif: parseFloat(this.inputs.psif.value),
-                    poles: parseInt(this.inputs.poles.value),
-                    rpm: parseFloat(this.inputs.rpm.value),
+                    Rs: this.readBoundedInput('Rs', this.motor.Rs),
+                    Ld: this.readBoundedInput('Ld', this.motor.Ld * 1e3),
+                    Lq: this.readBoundedInput('Lq', this.motor.Lq * 1e3),
+                    psif: this.readBoundedInput('psif', this.motor.psif),
+                    poles: this.readBoundedInput('poles', this.motor.poles, true),
+                    rpm: this.readBoundedInput('rpm', this.motor.rpmMagnitude),
                     direction: this.direction,
-                    Vdc: parseFloat(this.inputs.Vdc.value),
-                    Imax: parseFloat(this.inputs.Imax.value)
+                    Vdc: this.readBoundedInput('Vdc', this.motor.Vdc),
+                    Imax: this.readBoundedInput('Imax', this.motor.Imax)
                 };
                 this.motor.updateParams(p);
                 const volt = this.motor.solveVoltage(this.state.id, this.state.iq);
@@ -1654,17 +1747,21 @@
                 let p = {};
                 if (name === 'spmsm') {
                     p = { Rs: 0.5, Ld: 12, Lq: 12, psif: 0.18, poles: 4, rpm: 1500, Vdc: 260, Imax: 30 };
-                    this.state.id = 0; this.state.iq = 18;
+                    this.state.id = 0; this.state.iq = 10;
                 } else if (name === 'ipmsm') {
                     p = { Rs: 0.02, Ld: 0.2, Lq: 0.35, psif: 0.045, poles: 4, rpm: 9000, Vdc: 800, Imax: 500 };
                     this.state.id = -220; this.state.iq = 300;
                 } else if (name === 'highspeed') {
                     p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 3600, Vdc: 260, Imax: 30 };
-                    this.state.id = -18; this.state.iq = 12;
+                    this.state.id = -19; this.state.iq = 5;
                 } else if (name === 'fieldweakening') {
                     p = { Rs: 0.5, Ld: 10, Lq: 18, psif: 0.175, poles: 4, rpm: 4800, Vdc: 260, Imax: 30 };
-                    this.state.id = -22; this.state.iq = 8;
+                    this.state.id = -18.5; this.state.iq = 3.8;
+                } else {
+                    return;
                 }
+
+                p.direction = this.direction;
 
                 for (const [k, v] of Object.entries(p)) {
                     if (this.inputs[k]) this.inputs[k].value = v;
@@ -1672,6 +1769,7 @@
                 }
 
                 this.motor.updateParams(p);
+                this.direction = this.motor.direction;
                 const volt = this.motor.solveVoltage(this.state.id, this.state.iq);
                 this.state.ud = volt.ud;
                 this.state.uq = volt.uq;
@@ -1719,7 +1817,7 @@
                 this.metricsDOM.Pin.textContent = `${metrics.Pin.toFixed(1)} W`;
                 this.metricsDOM.Ploss.textContent = `${metrics.Ploss.toFixed(1)} W`;
                 this.metricsDOM.Pmech.textContent = `${metrics.Pmech.toFixed(1)} W`;
-                this.metricsDOM.pf.textContent = `${metrics.powerFactor.toFixed(3)}`;
+                this.metricsDOM.pf.textContent = metrics.powerFactor === null ? '—' : metrics.powerFactor.toFixed(3);
                 this.metricsDOM.pAngle.textContent = `${metrics.powerAngle.toFixed(1)}°`;
 
                 this.metricsDOM.vPercent.textContent = `${metrics.voltageRatio.toFixed(1)}%`;
@@ -1732,6 +1830,7 @@
 
                 this.metricsDOM.alertVoltage.style.display = metrics.isVoltageExceeded ? 'inline-flex' : 'none';
                 this.metricsDOM.alertCurrent.style.display = metrics.isCurrentExceeded ? 'inline-flex' : 'none';
+                this.metricsDOM.alertInverse.style.display = m.canSolveCurrent() ? 'none' : 'inline-flex';
 
                 // RENDER UNIFIED CANVAS
                 const r = this.renderer;
@@ -1749,7 +1848,9 @@
 
                 // 4. Flux Center (-psif/Ld, 0)
                 const fluxCenter = m.getVoltageEllipseCenterInCurrentPlane();
-                r.drawMarker(fluxCenter.id, fluxCenter.iq, '电压椭圆中心', '#ef4444');
+                if (fluxCenter) {
+                    r.drawMarker(fluxCenter.id, fluxCenter.iq, '电压椭圆中心', '#ef4444');
+                }
 
                 // 5. MTPA Curve
                 const mtpaPts = m.getMTPACurve(m.Imax, 50, m.direction);
