@@ -30,6 +30,18 @@ vm.runInContext(
 const MotorMathEngine = context.MotorMathEngineForTest;
 const UnifiedCanvasRenderer = context.UnifiedCanvasRendererForTest;
 const StandaloneApp = context.StandaloneAppForTest;
+const expectedLayerNames = [
+  'grid',
+  'currentLimit',
+  'voltageCircle',
+  'voltageEllipse',
+  'mtpa',
+  'mtpv',
+  'torque',
+  'currentVector',
+  'voltageVector',
+  'projections'
+];
 
 function createFakeElement(id) {
   return {
@@ -207,6 +219,39 @@ test('torque map renders both signs independently of speed direction', () => {
   );
 });
 
+test('canvas layers are independently switchable and default to visible', () => {
+  const layerNames = [...html.matchAll(/class="btn-layer active" data-layer="([^"]+)"/g)]
+    .map(match => match[1]);
+  assert.deepEqual(layerNames, expectedLayerNames);
+  assert.match(html, /if \(this\.layerVisibility\.torque\) \{[\s\S]*?getBidirectionalTorqueContours\(10\)/);
+  assert.match(html, /drawGrid\(m\.Imax, m\.Umax, this\.layerVisibility\.grid\)/);
+  assert.match(html, /this\.layerVisibility\.projections/);
+
+  const app = Object.create(StandaloneApp.prototype);
+  app.layerVisibility = Object.fromEntries(expectedLayerNames.map(name => [name, true]));
+  app.layerDOM = {
+    buttons: expectedLayerNames.map(name => {
+      const button = createFakeElement(`layer-${name}`);
+      button.dataset.layer = name;
+      return button;
+    }),
+    showAll: createFakeElement('show-all-layers')
+  };
+  let renderCount = 0;
+  app.renderAll = () => { renderCount += 1; };
+
+  app.setLayerVisibility('torque', false);
+  assert.equal(app.layerVisibility.torque, false);
+  assert.equal(renderCount, 1);
+
+  app.setLayerVisibility('not-a-layer', false);
+  assert.equal(renderCount, 1);
+
+  app.showAllLayers();
+  assert.ok(Object.values(app.layerVisibility).every(Boolean));
+  assert.equal(renderCount, 2);
+});
+
 test('singular inverse is reported and power-factor angle is normalized', () => {
   const singularMotor = new MotorMathEngine({
     Rs: 0,
@@ -288,6 +333,11 @@ test('standalone page boots and renders with every required DOM element', () => 
     button.dataset.preset = name;
     return button;
   });
+  const layerButtons = expectedLayerNames.map(name => {
+    const button = createFakeElement(`layer-${name}`);
+    button.dataset.layer = name;
+    return button;
+  });
 
   context.document = {
     addEventListener: () => {},
@@ -295,6 +345,7 @@ test('standalone page boots and renders with every required DOM element', () => 
     querySelectorAll: selector => {
       if (selector === '.btn-direction') return directionButtons;
       if (selector === '.btn-preset') return presetButtons;
+      if (selector === '.btn-layer') return layerButtons;
       return [];
     }
   };
@@ -303,7 +354,18 @@ test('standalone page boots and renders with every required DOM element', () => 
   domReadyHandler();
   assert.ok(context.window.app);
   assert.equal(context.window.app.motor.direction, 1);
+  assert.ok(Object.values(context.window.app.layerVisibility).every(Boolean));
   assert.match(elements.get('val-te').textContent, /N·m$/);
   assert.equal(elements.get('alert-voltage').style.display, 'none');
   assert.equal(elements.get('alert-current').style.display, 'none');
+
+  let torqueRenderCount = 0;
+  context.window.app.motor.getBidirectionalTorqueContours = () => {
+    torqueRenderCount += 1;
+    return [];
+  };
+  context.window.app.setLayerVisibility('torque', false);
+  assert.equal(torqueRenderCount, 0, 'hidden torque layer must skip contour generation');
+  context.window.app.setLayerVisibility('torque', true);
+  assert.equal(torqueRenderCount, 1, 'visible torque layer must generate contours');
 });

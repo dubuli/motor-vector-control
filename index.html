@@ -383,6 +383,75 @@
             box-shadow: 0 0 7px rgba(226, 232, 240, 0.65);
         }
 
+        .layer-toolbar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px 10px;
+            border: 1px solid rgba(71, 85, 105, 0.55);
+            border-radius: var(--radius-md);
+            background: rgba(15, 23, 42, 0.72);
+        }
+
+        .layer-toolbar-label {
+            flex: 0 0 auto;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .layer-controls {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .btn-layer,
+        .btn-layers-all {
+            border: 1px solid #334155;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.9);
+            color: #64748b;
+            font-family: inherit;
+            font-size: 10px;
+            line-height: 1;
+            padding: 6px 9px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+        }
+
+        .btn-layer:hover,
+        .btn-layer:focus-visible,
+        .btn-layers-all:hover,
+        .btn-layers-all:focus-visible {
+            border-color: #64748b;
+            color: #e2e8f0;
+            outline: none;
+        }
+
+        .btn-layer.active {
+            border-color: rgba(148, 163, 184, 0.62);
+            background: rgba(51, 65, 85, 0.72);
+            color: #e2e8f0;
+        }
+
+        .btn-layer:not(.active) {
+            opacity: 0.62;
+            text-decoration: line-through;
+            text-decoration-thickness: 1px;
+        }
+
+        .btn-layers-all {
+            flex: 0 0 auto;
+            margin-left: auto;
+            color: #94a3b8;
+        }
+
         /* LARGE CANVAS CONTAINER */
         .large-canvas-wrapper {
             width: 100%;
@@ -496,6 +565,15 @@
             .presets-group,
             .canvas-legend {
                 flex-wrap: wrap;
+            }
+
+            .layer-toolbar {
+                align-items: flex-start;
+                flex-wrap: wrap;
+            }
+
+            .btn-layers-all {
+                margin-left: 0;
             }
         }
 
@@ -703,6 +781,22 @@
                         <div class="legend-item"><span class="legend-dot torque"></span>±Te 等转矩线</div>
                     </div>
                 </div>
+                <div class="layer-toolbar" aria-label="画布图层显示控制">
+                    <span class="layer-toolbar-label">图层</span>
+                    <div class="layer-controls">
+                        <button type="button" class="btn-layer active" data-layer="grid" aria-pressed="true">网格</button>
+                        <button type="button" class="btn-layer active" data-layer="currentLimit" aria-pressed="true">电流圆</button>
+                        <button type="button" class="btn-layer active" data-layer="voltageCircle" aria-pressed="true">电压圆</button>
+                        <button type="button" class="btn-layer active" data-layer="voltageEllipse" aria-pressed="true">电压椭圆</button>
+                        <button type="button" class="btn-layer active" data-layer="mtpa" aria-pressed="true">MTPA</button>
+                        <button type="button" class="btn-layer active" data-layer="mtpv" aria-pressed="true">MTPV</button>
+                        <button type="button" class="btn-layer active" data-layer="torque" aria-pressed="true">±Te 等转矩</button>
+                        <button type="button" class="btn-layer active" data-layer="currentVector" aria-pressed="true">Is 矢量</button>
+                        <button type="button" class="btn-layer active" data-layer="voltageVector" aria-pressed="true">Us 矢量</button>
+                        <button type="button" class="btn-layer active" data-layer="projections" aria-pressed="true">分量投影</button>
+                    </div>
+                    <button type="button" id="btn-layers-all" class="btn-layers-all">全部显示</button>
+                </div>
                 <div class="large-canvas-wrapper">
                     <canvas id="unified-canvas"></canvas>
                 </div>
@@ -803,6 +897,7 @@
                 <p>4. <strong>正反转电压方程：</strong> <code>ud = Rs·id − ωe·Lq·iq</code>，<code>uq = Rs·iq + ωe·(Ld·id + ψf)</code>，其中 <code>ωe = s·P·2π|N|/60</code>，正转 <code>s = +1</code>、反转 <code>s = −1</code>。反转时交叉耦合项和反电动势项换号，电阻压降项不变。</p>
                 <p>5. <strong>方向与转矩相互独立：</strong> 方向按钮只切换转速和 <code>ωe</code> 的符号，不自动篡改电流。反转时保持正 <code>iq</code> 会进入发电/制动状态；要得到反转电动状态，应令转矩为负（通常对应负 <code>iq</code>）。MTPA/MTPV 显示所选旋转方向对应的电动轨迹；正、负等转矩线则作为完整转矩图谱同时显示，不随转速方向翻转。</p>
                 <p>6. <strong>MTPV 与等转矩线：</strong> 深弱磁区采用忽略定子电阻的标准最大转矩/电压轨迹。等转矩线按 <code>±0.1 / ±0.2 / … / ±1.0 × Tmax</code> 均匀取值，并由 <code>iq = T / [1.5p(ψf + (Ld−Lq)id)]</code> 直接计算。常规 FOC 转矩图只保留 <code>ψf + (Ld−Lq)id &gt; 0</code> 的有效分支，因此正转时上半平面 <code>iq &gt; 0</code> 为正转矩，下半平面 <code>iq &lt; 0</code> 为负转矩。左侧超限尾部在电流圆附近裁剪，右侧按公式延伸到显示边界，并在磁链零点前停止。</p>
+                <p>7. <strong>图层独立控制：</strong> 主图上方可分别显示或隐藏网格、限制边界、MTPA/MTPV、正负等转矩线、Is/Us 矢量及分量投影。图层开关只控制可见性，不改变电机参数、运行点或等转矩线的数学计算范围；坐标轴始终保留。</p>
             </div>
 
         </main>
@@ -1257,7 +1352,7 @@
                 };
             }
 
-            drawGrid(maxI, maxU) {
+            drawGrid(maxI, maxU, showGrid = true) {
                 const ctx = this.ctx;
                 ctx.clearRect(0, 0, this.width, this.height);
 
@@ -1265,43 +1360,45 @@
                 const range = maxI * 1.6;
                 this.scale = (Math.min(this.width, this.height) / 2 / range);
 
-                ctx.save();
-                ctx.strokeStyle = '#1e293b';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4, 4]);
+                if (showGrid) {
+                    ctx.save();
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([4, 4]);
 
-                const step = this.getNiceStep(range);
-                const startX = Math.floor((-this.width / 2 / this.scale) / step) * step;
-                const endX = Math.ceil((this.width / 2 / this.scale) / step) * step;
-                const startY = Math.floor((-this.height / 2 / this.scale) / step) * step;
-                const endY = Math.ceil((this.height / 2 / this.scale) / step) * step;
+                    const step = this.getNiceStep(range);
+                    const startX = Math.floor((-this.width / 2 / this.scale) / step) * step;
+                    const endX = Math.ceil((this.width / 2 / this.scale) / step) * step;
+                    const startY = Math.floor((-this.height / 2 / this.scale) / step) * step;
+                    const endY = Math.ceil((this.height / 2 / this.scale) / step) * step;
 
-                ctx.font = '11px sans-serif';
-                ctx.fillStyle = '#64748b';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                    ctx.font = '11px sans-serif';
+                    ctx.fillStyle = '#64748b';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
 
-                // Grid lines & Current (A) labels
-                for (let val = startX; val <= endX; val += step) {
-                    if (Math.abs(val) < 1e-4) continue;
-                    const { px } = this.toScreen(val, 0);
-                    ctx.beginPath();
-                    ctx.moveTo(px, 0);
-                    ctx.lineTo(px, this.height);
-                    ctx.stroke();
-                    ctx.fillText(`${val}A`, px, this.originY + 16);
+                    // Grid lines & Current (A) labels
+                    for (let val = startX; val <= endX; val += step) {
+                        if (Math.abs(val) < 1e-4) continue;
+                        const { px } = this.toScreen(val, 0);
+                        ctx.beginPath();
+                        ctx.moveTo(px, 0);
+                        ctx.lineTo(px, this.height);
+                        ctx.stroke();
+                        ctx.fillText(`${val}A`, px, this.originY + 16);
+                    }
+
+                    for (let val = startY; val <= endY; val += step) {
+                        if (Math.abs(val) < 1e-4) continue;
+                        const { py } = this.toScreen(0, val);
+                        ctx.beginPath();
+                        ctx.moveTo(0, py);
+                        ctx.lineTo(this.width, py);
+                        ctx.stroke();
+                        ctx.fillText(`${val}A`, this.originX - 25, py);
+                    }
+                    ctx.restore();
                 }
-
-                for (let val = startY; val <= endY; val += step) {
-                    if (Math.abs(val) < 1e-4) continue;
-                    const { py } = this.toScreen(0, val);
-                    ctx.beginPath();
-                    ctx.moveTo(0, py);
-                    ctx.lineTo(this.width, py);
-                    ctx.stroke();
-                    ctx.fillText(`${val}A`, this.originX - 25, py);
-                }
-                ctx.restore();
 
                 // Main Axes
                 ctx.save();
@@ -1504,7 +1601,7 @@
                 ctx.restore();
             }
 
-            drawVector(vx, vy, label, color, type, isHovered, isOverLimit, displayMagnitude = null) {
+            drawVector(vx, vy, label, color, type, isHovered, isOverLimit, displayMagnitude = null, showProjections = true) {
                 const ctx = this.ctx;
                 ctx.save();
 
@@ -1516,17 +1613,19 @@
                 const { px: xProj } = this.toScreen(vx, 0);
                 const { py: yProj } = this.toScreen(0, vy);
 
-                ctx.strokeStyle = mainColor;
-                ctx.lineWidth = 1;
-                ctx.setLineDash([3, 3]);
-                ctx.globalAlpha = 0.4;
-                ctx.beginPath();
-                ctx.moveTo(x1, y1); ctx.lineTo(xProj, y0);
-                ctx.moveTo(x1, y1); ctx.lineTo(x0, yProj);
-                ctx.stroke();
+                if (showProjections) {
+                    ctx.strokeStyle = mainColor;
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.globalAlpha = 0.4;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1); ctx.lineTo(xProj, y0);
+                    ctx.moveTo(x1, y1); ctx.lineTo(x0, yProj);
+                    ctx.stroke();
 
-                ctx.globalAlpha = 1.0;
-                ctx.setLineDash([]);
+                    ctx.globalAlpha = 1.0;
+                    ctx.setLineDash([]);
+                }
 
                 // Main Vector Line
                 ctx.strokeStyle = mainColor;
@@ -1574,6 +1673,18 @@
                 this.motor = new MotorMathEngine();
                 this.direction = this.motor.direction;
                 this.state = { id: -8, iq: 20, ud: 0, uq: 0 };
+                this.layerVisibility = {
+                    grid: true,
+                    currentLimit: true,
+                    voltageCircle: true,
+                    voltageEllipse: true,
+                    mtpa: true,
+                    mtpv: true,
+                    torque: true,
+                    currentVector: true,
+                    voltageVector: true,
+                    projections: true
+                };
 
                 // Scale factor to plot Voltage vector on same current canvas scale
                 this.Kv = 1.0; 
@@ -1635,6 +1746,11 @@
                     buttons: document.querySelectorAll('.btn-direction'),
                     operatingMode: document.getElementById('operating-mode'),
                     signedSpeed: document.getElementById('signed-speed')
+                };
+
+                this.layerDOM = {
+                    buttons: document.querySelectorAll('.btn-layer'),
+                    showAll: document.getElementById('btn-layers-all')
                 };
             }
 
@@ -1698,13 +1814,17 @@
             }
 
             detectHandleHover(px, py) {
-                const posI = this.getHandleScreenPos('current');
-                const distI = Math.hypot(px - posI.px, py - posI.py);
-                if (distI <= this.renderer.handleRadius + 8) return 'current';
+                if (this.layerVisibility.currentVector) {
+                    const posI = this.getHandleScreenPos('current');
+                    const distI = Math.hypot(px - posI.px, py - posI.py);
+                    if (distI <= this.renderer.handleRadius + 8) return 'current';
+                }
 
-                const posU = this.getHandleScreenPos('voltage');
-                const distU = Math.hypot(px - posU.px, py - posU.py);
-                if (distU <= this.renderer.handleRadius + 8) return 'voltage';
+                if (this.layerVisibility.voltageVector) {
+                    const posU = this.getHandleScreenPos('voltage');
+                    const distU = Math.hypot(px - posU.px, py - posU.py);
+                    if (distU <= this.renderer.handleRadius + 8) return 'voltage';
+                }
 
                 return null;
             }
@@ -1837,6 +1957,40 @@
                         this.setDirection(Number(e.currentTarget.dataset.direction));
                     });
                 });
+
+                this.layerDOM.buttons.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const layerName = e.currentTarget.dataset.layer;
+                        this.setLayerVisibility(layerName, !this.layerVisibility[layerName]);
+                    });
+                });
+
+                if (this.layerDOM.showAll) {
+                    this.layerDOM.showAll.addEventListener('click', () => this.showAllLayers());
+                }
+            }
+
+            syncLayerControls() {
+                this.layerDOM.buttons.forEach(btn => {
+                    const isVisible = this.layerVisibility[btn.dataset.layer] !== false;
+                    btn.classList.toggle('active', isVisible);
+                    btn.setAttribute('aria-pressed', String(isVisible));
+                });
+            }
+
+            setLayerVisibility(layerName, isVisible) {
+                if (!Object.prototype.hasOwnProperty.call(this.layerVisibility, layerName)) return;
+                this.layerVisibility[layerName] = Boolean(isVisible);
+                this.syncLayerControls();
+                this.renderAll();
+            }
+
+            showAllLayers() {
+                Object.keys(this.layerVisibility).forEach(layerName => {
+                    this.layerVisibility[layerName] = true;
+                });
+                this.syncLayerControls();
+                this.renderAll();
             }
 
             setDirection(direction) {
@@ -1956,43 +2110,79 @@
 
                 // RENDER UNIFIED CANVAS
                 const r = this.renderer;
-                r.drawGrid(m.Imax, m.Umax);
+                r.drawGrid(m.Imax, m.Umax, this.layerVisibility.grid);
 
                 // 1. Current Limit Circle (Cyan)
-                r.drawCircle(m.Imax, `Imax (${m.Imax}A)`, '#38bdf8');
+                if (this.layerVisibility.currentLimit) {
+                    r.drawCircle(m.Imax, `Imax (${m.Imax}A)`, '#38bdf8');
+                }
 
                 // 2. Voltage Limit Circle (Amber Mapped)
-                r.drawCircle(m.Umax * this.Kv, `Umax Circle (${m.Umax.toFixed(1)}V)`, '#f59e0b', [2, 4]);
+                if (this.layerVisibility.voltageCircle) {
+                    r.drawCircle(m.Umax * this.Kv, `Umax Circle (${m.Umax.toFixed(1)}V)`, '#f59e0b', [2, 4]);
+                }
 
                 // 3. Voltage Limit Ellipse (in Current Plane)
-                const vEllipsePts = m.getVoltageLimitCurveInCurrentPlane();
-                r.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax.toFixed(1)}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
+                if (this.layerVisibility.voltageEllipse) {
+                    const vEllipsePts = m.getVoltageLimitCurveInCurrentPlane();
+                    r.drawCurve(vEllipsePts, `Umax Ellipse (${m.Umax.toFixed(1)}V)`, '#f59e0b', 'rgba(245, 158, 11, 0.08)');
 
-                // 4. Flux Center (-psif/Ld, 0)
-                const fluxCenter = m.getVoltageEllipseCenterInCurrentPlane();
-                if (fluxCenter) {
-                    r.drawMarker(fluxCenter.id, fluxCenter.iq, '电压椭圆中心', '#ef4444');
+                    // 4. Voltage ellipse center
+                    const fluxCenter = m.getVoltageEllipseCenterInCurrentPlane();
+                    if (fluxCenter) {
+                        r.drawMarker(fluxCenter.id, fluxCenter.iq, '电压椭圆中心', '#ef4444');
+                    }
                 }
 
                 // 5. MTPA Curve
-                const mtpaPts = m.getMTPACurve(m.Imax, 50, m.direction);
-                r.drawMTPA(mtpaPts, '#10b981');
+                if (this.layerVisibility.mtpa) {
+                    const mtpaPts = m.getMTPACurve(m.Imax, 50, m.direction);
+                    r.drawMTPA(mtpaPts, '#10b981');
+                }
 
                 // 6. MTPV Curve
-                const mtpvPts = m.getMTPVCurve(m.Imax, 240, m.direction);
-                r.drawMTPV(mtpvPts, '#a855f7');
+                if (this.layerVisibility.mtpv) {
+                    const mtpvPts = m.getMTPVCurve(m.Imax, 240, m.direction);
+                    r.drawMTPV(mtpvPts, '#a855f7');
+                }
 
                 // 7. Signed torque map. Te(id, iq) is independent of speed direction.
-                const contours = m.getBidirectionalTorqueContours(10);
-                r.drawTorqueContours(contours);
+                if (this.layerVisibility.torque) {
+                    const contours = m.getBidirectionalTorqueContours(10);
+                    r.drawTorqueContours(contours);
+                }
 
                 // 8. Draw Current Vector Is
-                const isHoverI = r.hoveredHandle === 'current';
-                r.drawVector(s.id, s.iq, 'Is', '#38bdf8', 'current', isHoverI, metrics.isCurrentExceeded);
+                if (this.layerVisibility.currentVector) {
+                    const isHoverI = r.hoveredHandle === 'current';
+                    r.drawVector(
+                        s.id,
+                        s.iq,
+                        'Is',
+                        '#38bdf8',
+                        'current',
+                        isHoverI,
+                        metrics.isCurrentExceeded,
+                        null,
+                        this.layerVisibility.projections
+                    );
+                }
 
                 // 9. Draw Voltage Vector Us (Mapped to current canvas scale)
-                const isHoverU = r.hoveredHandle === 'voltage';
-                r.drawVector(s.ud * this.Kv, s.uq * this.Kv, 'Us', '#f59e0b', 'voltage', isHoverU, metrics.isVoltageExceeded, metrics.Us);
+                if (this.layerVisibility.voltageVector) {
+                    const isHoverU = r.hoveredHandle === 'voltage';
+                    r.drawVector(
+                        s.ud * this.Kv,
+                        s.uq * this.Kv,
+                        'Us',
+                        '#f59e0b',
+                        'voltage',
+                        isHoverU,
+                        metrics.isVoltageExceeded,
+                        metrics.Us,
+                        this.layerVisibility.projections
+                    );
+                }
             }
         }
 
